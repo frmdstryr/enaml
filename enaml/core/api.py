@@ -11,3 +11,4 @@ from .dynamic_template import DynamicTemplate
 from .include import Include
 from .looper import Looper
 from .object import Object
+from .block import Block
