@@ -6,6 +6,9 @@
 # The full license is in the file COPYING.txt, distributed with this software.
 #------------------------------------------------------------------------------
 import ast
+import pytest
+from textwrap import dedent
+from enaml.core.parser import parse
 
 
 def validate_ast(py_node, enaml_node, dump_ast=False, offset=0):
@@ -35,3 +38,117 @@ def validate_ast(py_node, enaml_node, dump_ast=False, offset=0):
             validate_ast(n1, enaml_node[i], offset=offset+1)
     else:
         assert py_node == enaml_node
+
+
+@pytest.mark.parametrize('src', [
+    """
+    class Test:
+        pass
+    """,
+
+    """
+    class Test():
+        pass
+    """,
+
+    """
+    class Test(object):
+        pass
+    """,
+
+    """
+    class Test(object, list):
+        pass
+    """,
+])
+def test_class_def(src):
+    """Test parsing all possible function signatures.
+
+    """
+    src = dedent(src)
+    py_ast = ast.parse(src).body[0]
+    enaml_ast = parse(src).body[0].ast.body[0]
+    validate_ast(py_ast, enaml_ast, True)
+
+
+@pytest.mark.parametrize('src', [
+    """
+    f1 = lambda: None
+    f2 = lambda: 1==2
+    f3 = lambda x,y: x,y
+    """,
+
+    """
+    x1 = 'a' in ['a', 'b']
+    x2 = 'a' not in ['b', 'c']
+    x3 = 1 if True else 0
+    x4 = 1 < 2 < 3
+    x5 = 1 | 2
+    x6 = 1//2
+    """,
+
+    """
+    try:
+        raise ValueError()
+    except:
+        raise
+    """,
+
+    """
+    try:
+        pass
+    finally:
+        pass
+    """,
+
+    """
+    with open('README.rst') as f1:
+        pass
+
+    """,
+
+    """
+    from functools import wraps
+    @wraps()
+    def wrapped():
+        pass
+        
+    """,
+
+    """
+    from functools import wraps
+    
+    def test(f):
+        @wraps(f)
+        def wrapped():
+            return f()
+        return wrapped
+        
+    """,
+
+    """
+    import atom.api
+    import atom.api as atom_api
+    from atom.api import *
+    from atom import api as atom_api
+    """,
+
+    # These don't work
+    # """
+    # print("Test")
+    # """,
+    #
+    # """
+    # with open('README.rst') as f1, open('MANIFEST.in') as f2:
+    #     pass
+    #
+    # """
+])
+def test_basics(src):
+    """Test other python syntaxes
+
+    """
+    src = dedent(src)
+    py_ast = ast.parse(src).body[0]
+    enaml_ast = parse(src).body[0].ast.body[0]
+    validate_ast(py_ast, enaml_ast, True)
