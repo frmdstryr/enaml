@@ -9,6 +9,8 @@ from atom.api import Atom, List, Typed
 from atom.datastructures.api import sortedmap
 
 from ..compat import IS_PY3
+from twisted.internet import reactor
+from twisted.internet.defer import Deferred
 
 
 class ReadHandler(Atom):
@@ -183,8 +185,40 @@ class ExpressionEngine(Atom):
         if handler is not None:
             pair = handler.read_pair
             if pair is not None:
-                return pair.reader(owner, name)
+                return self.read_async(pair.reader, owner, name)
         return NotImplemented
+
+    def read_async(self, reader, owner, name):
+        """ Read an expression and handle a potentially asynchronous result.
+        This will defer handling back to the application event loop until the 
+        result is resolved.
+        
+        Parameters
+        ----------
+        reader : ReadHandler
+            The read handler to invoke.
+            
+        owner : Declarative
+            The declarative object which owns the engine.
+        
+        name : str
+            The name of the relevant bound expression.
+        
+        Returns
+        -------
+        result : object or NotImplemented
+            The evaluated value of the expression, or NotImplemented
+            if there is no readable expression in the engine.
+        
+        """
+        # If we get a deferred "block" until we get the result
+        # by continuing to run the reactor until it resolves
+        d = reader(owner, name)
+        if isinstance(d, Deferred):
+            while not d.called:
+                reactor.doIteration(0.00001)
+            d = d.result
+        return d
 
     def write(self, owner, name, change):
         """ Write a change to an expression.
@@ -245,7 +279,8 @@ class ExpressionEngine(Atom):
                 if key not in guards:
                     guards.add(key)
                     try:
-                        setattr(owner, name, pair.reader(owner, name))
+                        setattr(owner, name,
+                                self.read_async(pair.reader, owner, name))
                     finally:
                         guards.remove(key)
 
