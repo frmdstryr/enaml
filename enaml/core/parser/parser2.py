@@ -199,8 +199,6 @@ class Python2EnamlParser(BaseEnamlParser):
         if kwarg is not None:
             if isinstance(kwarg, ast.Name):
                 kwarg = kwarg.id
-            elif isinstance(kwarg, basestring):
-                pass
             else:  # This is a tuple
                 msg = "cannot use list as **kwarg"
                 tok = FakeToken(self.lexer.lexer, kwarg.lineno)
