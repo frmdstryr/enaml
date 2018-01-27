@@ -11,6 +11,7 @@ from atom.datastructures.api import sortedmap
 from ..compat import IS_PY3
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
+from twisted.python.failure import Failure
 
 
 class ReadHandler(Atom):
@@ -218,6 +219,8 @@ class ExpressionEngine(Atom):
             while not d.called:
                 reactor.doIteration(0.00001)
             d = d.result
+            if isinstance(d, Failure):
+                raise d
         return d
 
     def write(self, owner, name, change):
