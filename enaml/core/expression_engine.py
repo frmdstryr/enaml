@@ -212,16 +212,23 @@ class ExpressionEngine(Atom):
             if there is no readable expression in the engine.
         
         """
-        # If we get a deferred "block" until we get the result
-        # by continuing to run the reactor until it resolves
+        # If we get a deferred "Block" until we get the result
         d = reader(owner, name)
-        if isinstance(d, Deferred):
+        if not isinstance(d, Deferred):
+            return d
+
+        # Save a reference to the current deferred
+        current = d
+
+        # Wait for all dependent deferreds to resolve as well
+        while isinstance(d, Deferred):
             while not d.called:
                 reactor.doIteration(0.00001)
             d = d.result
             if isinstance(d, Failure):
                 raise d
-        return d
+
+        return current.result
 
     def write(self, owner, name, change):
         """ Write a change to an expression.
