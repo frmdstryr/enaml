@@ -11,6 +11,21 @@
 import os
 from traceback import format_exc
 
+import atexit
+from cProfile import Profile
+from pstats import Stats
+
+profile = Profile()
+profile.enable()
+
+
+def dump_stats():
+    profile.disable()
+    stats = Stats(profile)
+    stats.sort_stats('cumtime')
+    stats.print_stats()
+atexit.register(dump_stats)
+
 # Make sure enaml already imported qt to avoid issues with pytest
 try:
     from enaml.qt import QT_API, PYQT5_API, PYQT4_API, PYSIDE_API, PYSIDE2_API

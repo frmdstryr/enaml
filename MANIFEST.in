@@ -12,6 +12,7 @@ recursive-include tools *.*
 recursive-include tests *.py
 recursive-include enaml/src *.cpp
 recursive-include enaml/src *.h
+recursive-include enaml *.pyx
 prune .git
 prune docs/build
 prune dist

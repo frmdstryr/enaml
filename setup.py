@@ -12,6 +12,7 @@ from setuptools import find_packages, Extension, setup
 from setuptools.command.build_ext import build_ext
 from setuptools.command.install import install
 from setuptools.command.develop import develop
+from Cython.Build import cythonize
 
 sys.path.insert(0, os.path.abspath('.'))
 from enaml.version import __version__
@@ -66,8 +67,13 @@ ext_modules = [
         'enaml.c_compat',
         ['enaml/src/c_compat.cpp'],
         language='c++',
-    )
+    ),
 ]
+ext_modules += cythonize(
+    #'enaml/core/byteplay/*.pyx',
+    'enaml/core/byteplay/byteplay2.pyx',
+    annotate=True
+)
 
 
 if sys.platform == 'win32':
