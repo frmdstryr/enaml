@@ -155,6 +155,9 @@ class ExpressionEngine(Atom):
         handler = self._handlers.get(name)
         if handler is None:
             handler = self._handlers[name] = HandlerSet()
+        else:
+            # Don't squash overridden handlers
+            self._handlers['super.%s' % name] = handler.copy()
         handler.all_pairs.append(pair)
         if pair.reader is not None:
             handler.read_pair = pair

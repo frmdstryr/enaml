@@ -16,6 +16,14 @@ from .standard_inverter import StandardInverter
 from .standard_tracer import StandardTracer
 
 
+class SuperProxy(Atom):
+    owner = Typed(Atom)
+
+    def __getattr__(self, attr):
+        owner = self.owner
+        return owner._d_engine.read(owner, 'super.%s' % attr)
+
+
 class HandlerMixin(Atom):
     """ A mixin class which provides common handler functionality.
 
@@ -43,7 +51,9 @@ class HandlerMixin(Atom):
             A mapping object to use as the local scope.
 
         """
-        return owner._d_storage.get(self.scope_key) or {}
+        f_locals = owner._d_storage.get(self.scope_key) or {}
+        f_locals['super'] = SuperProxy(owner=owner)
+        return f_locals
 
 
 class StandardReadHandler(ReadHandler, HandlerMixin):
