@@ -83,6 +83,15 @@ def fetch_scope(key):
     return __map[key]
 
 
+class SuperProxy(Atom):
+    owner = Typed(Atom)
+    base = Typed(object)
+
+    def __getattr__(self, attr):
+        owner = self.owner
+        return owner._d_engine.read(owner, attr, self.base)
+
+
 class CompilerNode(Atom):
     """ A base class for defining compiler nodes.
 
@@ -183,9 +192,12 @@ class DeclarativeNode(CompilerNode):
             The declarative instance for this node.
 
         """
+        f_locals = peek_scope()
         if self.super_node is not None:
             self.super_node(instance)
-        f_locals = peek_scope()
+            base = self.super_node.klass
+            f_locals['super'] = SuperProxy(owner=instance, base=base)
+
         scope_key = self.scope_key
         if self.identifier:
             f_locals[self.identifier] = instance

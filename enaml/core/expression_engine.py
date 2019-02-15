@@ -140,11 +140,14 @@ class ExpressionEngine(Atom):
         __nonzero__ = __bool__
         del __bool__
 
-    def add_pair(self, name, pair):
+    def add_pair(self, node, name, pair):
         """ Add a HandlerPair to the engine.
 
         Parameters
         ----------
+        node: DeclarativeNode
+            The compiler node holding the declarative class.
+
         name : str
             The name of the attribute to which the pair is bound.
 
@@ -152,16 +155,26 @@ class ExpressionEngine(Atom):
             The pair to bind to the expression.
 
         """
-        handler = self._handlers.get(name)
+        handler_set = self._handlers.get('instance')
+        if handler_set is None:
+            handler_set = self._handlers['instance'] = sortedmap()
+        handler = handler_set.get(name)
         if handler is None:
-            handler = self._handlers[name] = HandlerSet()
+            handler = handler_set[name] = HandlerSet()
+        if node.super_node is not None:
+            base_class = node.super_node.klass
+            cls_handlers = self._handlers.get(base_class)
+            if cls_handlers is None:
+                cls_handlers = self._handlers[base_class] = sortedmap()
+            cls_handlers[name] = handler.copy()
+
         handler.all_pairs.append(pair)
         if pair.reader is not None:
             handler.read_pair = pair
         if pair.writer is not None:
             handler.write_pairs.append(pair)
 
-    def read(self, owner, name):
+    def read(self, owner, name, cls=None):
         """ Compute and return the value of an expression.
 
         Parameters
@@ -179,7 +192,10 @@ class ExpressionEngine(Atom):
             if there is no readable expression in the engine.
 
         """
-        handler = self._handlers.get(name)
+        handler_set = self._handlers.get(cls or 'instance')
+        if handler_set is None:
+            return NotImplemented
+        handler = handler_set.get(name)
         if handler is not None:
             pair = handler.read_pair
             if pair is not None:
@@ -206,7 +222,7 @@ class ExpressionEngine(Atom):
             which owns the engine.
 
         """
-        handler = self._handlers.get(name)
+        handler = self._handlers['instance'].get(name)
         if handler is not None:
             guards = self._guards
             for pair in handler.write_pairs:
@@ -236,7 +252,7 @@ class ExpressionEngine(Atom):
             The name of the relevant bound expression.
 
         """
-        handler = self._handlers.get(name)
+        handler = self._handlers['instance'].get(name)
         if handler is not None:
             pair = handler.read_pair
             if pair is not None:
@@ -260,7 +276,10 @@ class ExpressionEngine(Atom):
         """
         new = ExpressionEngine()
         handlers = sortedmap()
-        for key, value in self._handlers.items():
-            handlers[key] = value.copy()
+        for cls, handler_set in self._handlers.items():
+            mapping = sortedmap()
+            for key, value in handler_set.items():
+                mapping[key] = value.copy()
+            handlers[cls] = mapping
         new._handlers = handlers
         return new

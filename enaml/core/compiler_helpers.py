@@ -436,7 +436,7 @@ def bind_aliased_member_impl(name, node, member, pair, scope_key):
         raise TypeError("alias '%s' is not writable from enaml" % name)
     if node.engine is None:
         node.engine = ExpressionEngine()
-    node.engine.add_pair(member.name, pair)
+    node.engine.add_pair(node, member.name, pair)
     if node.closure_keys is None:
         node.closure_keys = set()
     node.closure_keys.add(scope_key)
@@ -545,7 +545,7 @@ def bind_member(node, name, pair):
         raise TypeError("'%s' is not writable from enaml" % name)
     if node.engine is None:
         node.engine = ExpressionEngine()
-    node.engine.add_pair(name, pair)
+    node.engine.add_pair(node, name, pair)
 
 
 def run_operator(scope_node, node, name, op, code, f_globals):
