@@ -183,6 +183,8 @@ class DeclarativeNode(CompilerNode):
             The declarative instance for this node.
 
         """
+        if instance._d_node is None:
+            instance._d_node = self
         if self.super_node is not None:
             self.super_node(instance)
         f_locals = peek_scope()

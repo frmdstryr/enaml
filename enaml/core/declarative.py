@@ -5,9 +5,10 @@
 #
 # The full license is in the file COPYING.txt, distributed with this software.
 #------------------------------------------------------------------------------
-from atom.api import Event, Typed, Unicode
+from atom.api import Event, Instance, Typed, Unicode
 from atom.datastructures.api import sortedmap
 
+from .compiler_nodes import CompilerNode
 from .declarative_meta import DeclarativeMeta
 from .expression_engine import ExpressionEngine
 from .object import Object, flag_generator, flag_property
@@ -100,6 +101,10 @@ class Declarative(with_metaclass(DeclarativeMeta, Object)):
     #: be manipulated by user code.
     _d_engine = Typed(ExpressionEngine)
 
+    #: The compiler node reference. This value should not
+    #: be manipulated by user code.
+    _d_node = Instance(CompilerNode)
+
     def initialize(self):
         """ Initialize this object all of its children recursively.
 
@@ -126,6 +131,7 @@ class Declarative(with_metaclass(DeclarativeMeta, Object)):
         self.is_initialized = False
         del self._d_storage
         del self._d_engine
+        del self._d_node
         super(Declarative, self).destroy()
 
     def child_added(self, child):
