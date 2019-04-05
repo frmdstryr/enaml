@@ -38,6 +38,10 @@ class Python35EnamlParser(Python34EnamlParser):
         dict(list(Python34EnamlParser._NOTIFICATION_DISALLOWED.items()) +
              [(ast.AsyncFunctionDef, 'async function definition')])
 
+    _SUBSCRIPTION_DISALLOWED =\
+        dict(list(Python34EnamlParser._SUBSCRIPTION_DISALLOWED.items()) +
+             [(ast.AsyncFunctionDef, 'async function definition')])
+
     _DECL_FUNCDEF_DISALLOWED =\
         dict(list(Python34EnamlParser._DECL_FUNCDEF_DISALLOWED.items()) +
              [(ast.AsyncFunctionDef, 'async function definition')])
@@ -167,7 +171,7 @@ class Python35EnamlParser(Python34EnamlParser):
                                 | child_def
                                 | template_inst '''
         p[0] = p[1]
-    
+
     def p_child_def_suite_item(self, p):
         ''' child_def_suite_item : child_def_simple_item
                                  | decl_funcdef
@@ -175,7 +179,7 @@ class Python35EnamlParser(Python34EnamlParser):
                                  | child_def
                                  | template_inst '''
         p[0] = p[1]
-    
+
     def p_async_decl_funcdef(self, p):
         ''' async_decl_funcdef : ASYNC decl_funcdef '''
         decl_funcdef = p[2]
