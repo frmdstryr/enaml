@@ -1,11 +1,13 @@
 #------------------------------------------------------------------------------
-# Copyright (c) 2017, Nucleic Development Team.
+# Copyright (c) 2017-2021, Nucleic Development Team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
 # The full license is in the file LICENSE, distributed with this software.
 #------------------------------------------------------------------------------
 from .autumn import AUTUMN_THEME
+from .borland import BORLAND_THEME
+from .bw import BW_THEME
 from .colorful import COLORFUL_THEME
 from .default import DEFAULT_THEME
 from .emacs import EMACS_THEME
@@ -21,10 +23,13 @@ from .perldoc import PERLDOC_THEME
 from .tango import TANGO_THEME
 from .trac import TRAC_THEME
 from .vim import VIM_THEME
+from .vs import VS_THEME
 
 
 THEMES = {
     'autumn': AUTUMN_THEME,
+    'boreland': BORLAND_THEME,
+    'bw': BW_THEME,
     'colorful': COLORFUL_THEME,
     'default': DEFAULT_THEME,
     'emacs': EMACS_THEME,
@@ -40,4 +45,5 @@ THEMES = {
     'tango': TANGO_THEME,
     'trac': TRAC_THEME,
     'vim': VIM_THEME,
+    'vs': VS_THEME,
 }

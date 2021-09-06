@@ -7,7 +7,9 @@
 #------------------------------------------------------------------------------
 import re
 import os
+import sys
 import json
+import argparse
 from typing import Dict
 from glob import glob
 from datetime import datetime
@@ -88,14 +90,15 @@ def parse(css_file: str) -> Dict[str, Dict[str, str]]:
         items[label.lower().replace(".", "_")] = style
     return items
 
-def generate(css_file: str):
+def generate(css_file: str, output_dir: str):
     """ Generate a theme for the given css file path.
 
     Parameters
     ----------
     css_file: str
         The css file to parse
-
+    output_dir: str
+        The output path to save the file in
     """
     print(css_file)
     css = parse(css_file)
@@ -130,9 +133,10 @@ def generate(css_file: str):
         "python": theme,
         "settings": settings,
     }
-    if not os.path.exists("output"):
-        os.makedirs("output")
-    with open(f"output/{theme_name}.py", "w") as f:
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    with open(f"{output_dir}/{theme_name}.py", "w") as f:
         f.write(HEADER)
         f.write("%s = " % class_name)
         f.write(json.dumps(output, indent=4, sort_keys=True))
@@ -141,8 +145,24 @@ def generate(css_file: str):
 
 
 def main():
-    for css_file in sorted(glob("*/*.css")):
-        generate(css_file)
+    parser = argparse.ArgumentParser(
+        description='Generate themes from pygments themes.')
+    parser.add_argument(
+        '-i', '--input_dir', type=str, default="./",
+        required=False, dest='input_dir',
+        help="directory to search for pygments css files")
+    parser.add_argument(
+        '-o', '--output_dir', type=str, default="./output",
+        required=False, dest='output_dir',
+        help="directory to save generated themes")
+    args = parser.parse_args()
+    css_files = glob(f"{args.input_dir}*/*.css")
+    if not css_files:
+        print("no css files found")
+        sys.exit(1)
+
+    for css_file in sorted(css_files):
+        generate(css_file, args.output_dir)
 
 
 if __name__ == '__main__':
