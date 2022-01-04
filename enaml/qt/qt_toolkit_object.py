@@ -7,9 +7,24 @@
 #------------------------------------------------------------------------------
 from atom.api import Typed
 
+from enaml.qt import QT_API, PYQT5_API
 from enaml.widgets.toolkit_object import ProxyToolkitObject
 
 from .QtCore import QObject
+
+
+try:
+    if QT_API in PYQT5_API:
+        from qtpy.sip import isdeleted as is_deleted
+    else:
+        from shiboken import isValid
+
+        def is_deleted(widget):
+            return not isValid(widget)
+except ImportError as e:
+    # Fallback
+    def is_deleted(widget):
+        return False
 
 
 class QtToolkitObject(ProxyToolkitObject):
@@ -90,8 +105,9 @@ class QtToolkitObject(ProxyToolkitObject):
         """
         widget = self.widget
         if widget is not None:
-            widget.setParent(None)
-            widget.deleteLater()
+            if not is_deleted(widget):
+                widget.setParent(None)
+                widget.deleteLater()
             del self.widget
         super(QtToolkitObject, self).destroy()
 
@@ -103,7 +119,7 @@ class QtToolkitObject(ProxyToolkitObject):
 
         """
         super(QtToolkitObject, self).child_removed(child)
-        if child.widget is not None:
+        if child.widget is not None and not is_deleted(child.widget):
             child.widget.setParent(None)
 
     #--------------------------------------------------------------------------
