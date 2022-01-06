@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2017-2021, Nucleic Development Team.
+# Copyright (c) 2017-2022, Nucleic Development Team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -14,11 +14,11 @@ VS_THEME = {
         "comment": {
             "color": "#008000"
         },
-        "comment_block": {
+        "comment_bock": {
             "color": "#008000"
         },
-        "default": {
-            "background": "#ffffff"
+        "double_quoted_fstring": {
+            "color": "#a31515"
         },
         "double_quoted_string": {
             "color": "#a31515"
@@ -26,13 +26,19 @@ VS_THEME = {
         "keyword": {
             "color": "#0000ff"
         },
-        "operator": {
-            "color": "#0000ff"
+        "single_quoted_fstring": {
+            "color": "#a31515"
         },
         "single_quoted_string": {
             "color": "#a31515"
         },
+        "triple_double_quoted_fstring": {
+            "color": "#a31515"
+        },
         "triple_double_quoted_string": {
+            "color": "#a31515"
+        },
+        "triple_single_quoted_fstring": {
             "color": "#a31515"
         },
         "triple_single_quoted_string": {

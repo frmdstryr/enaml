@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2017-2021, Nucleic Development Team.
+# Copyright (c) 2017-2022, Nucleic Development Team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -14,11 +14,11 @@ BW_THEME = {
         "comment": {
             "font-style": "italic"
         },
-        "comment_block": {
+        "comment_bock": {
             "font-style": "italic"
         },
-        "default": {
-            "background": "#ffffff"
+        "double_quoted_fstring": {
+            "font-style": "italic"
         },
         "double_quoted_string": {
             "font-style": "italic"
@@ -26,13 +26,19 @@ BW_THEME = {
         "keyword": {
             "font-weight": "bold"
         },
-        "operator": {
-            "font-weight": "bold"
+        "single_quoted_fstring": {
+            "font-style": "italic"
         },
         "single_quoted_string": {
             "font-style": "italic"
         },
+        "triple_double_quoted_fstring": {
+            "font-style": "italic"
+        },
         "triple_double_quoted_string": {
+            "font-style": "italic"
+        },
+        "triple_single_quoted_fstring": {
             "font-style": "italic"
         },
         "triple_single_quoted_string": {

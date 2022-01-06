@@ -1,63 +1,81 @@
-#------------------------------------------------------------------------------
-# Copyright (c) 2017, Nucleic Development Team.
+#-----------------------------------------------------------------------------
+# Copyright (c) 2017-2022, Nucleic Development Team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
 # The full license is in the file LICENSE, distributed with this software.
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 
 MANNI_THEME = {
     "python": {
-        "comment": {
-            "color": "#0099FF",
-            "font-style": "italic"
-        },
-        "single_quoted_string": {
-            "color": "#CC3300"
-        },
         "class_name": {
             "color": "#00AA88",
             "font-weight": "bold"
         },
-        "function_method_name": {
-            "color": "#CC00FF"
+        "comment": {
+            "color": "#0099FF",
+            "font-style": "italic"
         },
-        "operator": {
-            "color": "#555555"
-        },
-        "double_quoted_string": {
-            "color": "#CC3300"
-        },
-        "triple_double_quoted_string": {
-            "color": "#CC3300"
+        "comment_bock": {
+            "color": "#0099FF",
+            "font-style": "italic"
         },
         "decorator": {
             "color": "#9999FF"
         },
-        "comment_block": {
-            "color": "#0099FF",
-            "font-style": "italic"
+        "double_quoted_fstring": {
+            "color": "#CC3300"
+        },
+        "double_quoted_string": {
+            "color": "#CC3300"
+        },
+        "function_method_name": {
+            "color": "#CC00FF"
+        },
+        "highlighted_identifier": {
+            "color": "#336666"
+        },
+        "identifier": {
+            "color": "#003333"
         },
         "keyword": {
             "color": "#006699",
             "font-weight": "bold"
         },
+        "number": {
+            "color": "#FF6600"
+        },
+        "operator": {
+            "color": "#555555"
+        },
+        "single_quoted_fstring": {
+            "color": "#CC3300"
+        },
+        "single_quoted_string": {
+            "color": "#CC3300"
+        },
+        "triple_double_quoted_fstring": {
+            "color": "#CC3300"
+        },
+        "triple_double_quoted_string": {
+            "color": "#CC3300"
+        },
+        "triple_single_quoted_fstring": {
+            "color": "#CC3300"
+        },
         "triple_single_quoted_string": {
             "color": "#CC3300"
         },
         "unclosed_string": {
-            "color": "#AA0000",
-            "paper": "#FFAAAA"
-        },
-        "highlighted_identifier": {
-            "paper": "#ffffcc"
+            "background-color": "#FFAAAA",
+            "color": "#AA0000"
         }
     },
     "settings": {
         "caret": "#000000",
         "color": "#000000",
-        "paper": "#f0f3f3",
-        "name": "manni"
+        "name": "manni",
+        "paper": "#ffffff"
     }
 }
 

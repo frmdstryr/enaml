@@ -1,63 +1,78 @@
-#------------------------------------------------------------------------------
-# Copyright (c) 2017, Nucleic Development Team.
+#-----------------------------------------------------------------------------
+# Copyright (c) 2017-2022, Nucleic Development Team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
 # The full license is in the file LICENSE, distributed with this software.
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 
 TRAC_THEME = {
     "python": {
+        "class_name": {
+            "color": "#445588",
+            "font-weight": "bold"
+        },
         "comment": {
             "color": "#999988",
             "font-style": "italic"
         },
-        "single_quoted_string": {
+        "comment_bock": {
+            "color": "#999988",
+            "font-style": "italic"
+        },
+        "double_quoted_fstring": {
             "color": "#bb8844"
         },
-        "class_name": {
-            "color": "#445588",
-            "font-weight": "bold"
+        "double_quoted_string": {
+            "color": "#bb8844"
         },
         "function_method_name": {
             "color": "#990000",
             "font-weight": "bold"
         },
+        "highlighted_identifier": {
+            "color": "#999999"
+        },
+        "identifier": {
+            "color": "#008080"
+        },
+        "keyword": {
+            "font-weight": "bold"
+        },
+        "number": {
+            "color": "#009999"
+        },
         "operator": {
             "font-weight": "bold"
         },
-        "double_quoted_string": {
+        "single_quoted_fstring": {
+            "color": "#bb8844"
+        },
+        "single_quoted_string": {
+            "color": "#bb8844"
+        },
+        "triple_double_quoted_fstring": {
             "color": "#bb8844"
         },
         "triple_double_quoted_string": {
             "color": "#bb8844"
         },
-        "decorator": {
-            "paper": "#ffffff"
-        },
-        "comment_block": {
-            "color": "#999988",
-            "font-style": "italic"
-        },
-        "keyword": {
-            "font-weight": "bold"
+        "triple_single_quoted_fstring": {
+            "color": "#bb8844"
         },
         "triple_single_quoted_string": {
             "color": "#bb8844"
         },
         "unclosed_string": {
-            "color": "#a61717",
-            "paper": "#e3d2d2"
-        },
-        "highlighted_identifier": {
-            "paper": "#ffffcc"
+            "background-color": "#e3d2d2",
+            "color": "#a61717"
         }
     },
     "settings": {
         "caret": "#000000",
         "color": "#000000",
-        "paper": "#ffffff",
-        "name": "trac"
+        "name": "trac",
+        "paper": "#ffffff"
     }
 }
 

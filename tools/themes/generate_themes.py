@@ -33,22 +33,30 @@ TOKEN_MAPPING = [
     ("comment_multiline", "comment_bock"),
     ("name_decorator", "decorator"),
     ("default", "default"),
-    ("literal_string", "single_quoted_string"),
-    ("literal_string", "double_quoted_string"),
     ("name_function", "function_method_name"),
-    ("name_variable", "highlighted_identifier"),
+    ("name_builtin", "highlighted_identifier"),
     ("name_variable", "identifier"),
     ("keyword", "keyword"),
     ("literal_number", "number"),
-    ("operator_word", "operator"),
+    ("operator", "operator"),
     ("literal_string", "single_quoted_string"),
+    ("literal_string", "single_quoted_fstring"),
+    ("literal_string", "double_quoted_string"),
+    ("literal_string", "double_quoted_fstring"),
     ("literal_string", "triple_double_quoted_string"),
+    ("literal_string", "triple_double_quoted_fstring"),
     ("literal_string", "triple_single_quoted_string"),
+    ("literal_string", "triple_single_quoted_fstring"),
     ("error", "unclosed_string"),
 ]
 
+TOKEN_MAPPING_VARIATION = [
+    ("highlighted_identifier", "identifier", ["name_attribute", "name_property"]),
+    ("class_name", "identifier", ["name_entity", "name_namespace"]),
+]
+
 # CSS line pattern
-PATTERN = r"\.highlight (?:\.([a-z0-9]+))?\s*{ (.+) }\s*(?:/\* (.+) \*/)?"
+PATTERN = r"\.highlight\s*(.+)\s*{\s*(.+)\s*}\s*(?:/\* (.+) \*/)?"
 
 
 def parse(css_file: str) -> Dict[str, Dict[str, str]]:
@@ -73,22 +81,27 @@ def parse(css_file: str) -> Dict[str, Dict[str, str]]:
             continue
         m = re.match(PATTERN, line)
         if not m:
+            print(f'Ingoring: "{line}"')
             continue
         key, styles, label = m.groups()
+
+        key = key.strip('. ')
+        if key.endswith('table'):
+            key = None
 
         # If label/comment is missing use the set it to default or the css key
         if label is None and key is None:
             label = "default"
         elif label is None:
             label = "background" if key == "hll" else key
-
         style = {}
         for item in styles.split(";"):
-            if item:
+            if item and ":" in item:
                 k, v = item.split(":")
-                style[k.strip()] = v.strip()
+                style[k.strip()] = v.replace("!important", "").strip()
         items[label.lower().replace(".", "_")] = style
     return items
+
 
 def generate(css_file: str, output_dir: str):
     """ Generate a theme for the given css file path.
@@ -100,12 +113,13 @@ def generate(css_file: str, output_dir: str):
     output_dir: str
         The output path to save the file in
     """
-    print(css_file)
+    print(f'Parsing {css_file}')
     css = parse(css_file)
-    theme_name = os.path.basename(css_file)[:-4]
-
+    base_name = os.path.splitext(os.path.basename(css_file))[0]
+    if base_name.startswith("pygments"):
+        base_name = base_name[8:]
+    theme_name = base_name.replace("-", "_").lstrip('1234567890_')
     theme = {}
-
     background = "#ffffff"
     color = "#000000"
     if "default" in css:
@@ -128,6 +142,18 @@ def generate(css_file: str, output_dir: str):
             if pygments_name == name:
                 theme[token_name] = styles
 
+    # Try to insert some variation to avoid themes with
+    # a lot of the the same colors
+    for name, other, alt_styles in TOKEN_MAPPING_VARIATION:
+        style = theme.get(name)
+        if style != theme.get(other):
+            continue  # Already different
+        for pygments_name in alt_styles:
+            new_style = css.get(pygments_name)
+            if new_style and new_style != style:
+                theme[name] = new_style
+                break
+
     class_name = f'{theme_name.upper()}_THEME'
     output = {
         "python": theme,
@@ -136,12 +162,27 @@ def generate(css_file: str, output_dir: str):
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    with open(f"{output_dir}/{theme_name}.py", "w") as f:
+    output_file = os.path.join(output_dir, f'{theme_name}.py')
+    with open(output_file, "w") as f:
         f.write(HEADER)
         f.write("%s = " % class_name)
         f.write(json.dumps(output, indent=4, sort_keys=True))
         f.write("\n\n")
         f.write("%s['enaml'] = %s['python']\n" % (class_name, class_name))
+    return theme_name
+
+
+def generate_init(themes, output_dir):
+    init_py = os.path.join(output_dir, '__init__.py')
+    with open(init_py, 'w') as f:
+        f.write(HEADER)
+        for t in themes:
+            f.write(f"from .{t} import {t.upper()}_THEME\n")
+
+        f.write("\nTHEMES = {\n")
+        for t in themes:
+            f.write(f"    '{t}': {t.upper()}_THEME,\n")
+        f.write("}\n")
 
 
 def main():
@@ -161,8 +202,12 @@ def main():
         print("no css files found")
         sys.exit(1)
 
+    themes = set()
     for css_file in sorted(css_files):
-        generate(css_file, args.output_dir)
+        theme = generate(css_file, args.output_dir)
+        themes.add(theme)
+    themes.add('idle')
+    generate_init(sorted(themes), args.output_dir)
 
 
 if __name__ == '__main__':

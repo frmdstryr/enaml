@@ -1,61 +1,76 @@
-#------------------------------------------------------------------------------
-# Copyright (c) 2017, Nucleic Development Team.
+#-----------------------------------------------------------------------------
+# Copyright (c) 2017-2022, Nucleic Development Team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
 # The full license is in the file LICENSE, distributed with this software.
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 
 PERLDOC_THEME = {
     "python": {
-        "comment": {
-            "color": "#228B22"
-        },
-        "single_quoted_string": {
-            "color": "#CD5555"
-        },
         "class_name": {
             "color": "#008b45",
             "font-weight": "bold"
         },
-        "function_method_name": {
-            "color": "#008b45"
+        "comment": {
+            "color": "#228B22"
         },
-        "operator": {
-            "paper": "#eeeedd"
-        },
-        "double_quoted_string": {
-            "color": "#CD5555"
-        },
-        "triple_double_quoted_string": {
-            "color": "#CD5555"
+        "comment_bock": {
+            "color": "#228B22"
         },
         "decorator": {
             "color": "#707a7c"
         },
-        "comment_block": {
-            "color": "#228B22"
+        "double_quoted_fstring": {
+            "color": "#CD5555"
+        },
+        "double_quoted_string": {
+            "color": "#CD5555"
+        },
+        "function_method_name": {
+            "color": "#008b45"
+        },
+        "highlighted_identifier": {
+            "color": "#658b00"
+        },
+        "identifier": {
+            "color": "#00688B"
         },
         "keyword": {
             "color": "#8B008B",
             "font-weight": "bold"
         },
+        "number": {
+            "color": "#B452CD"
+        },
+        "single_quoted_fstring": {
+            "color": "#CD5555"
+        },
+        "single_quoted_string": {
+            "color": "#CD5555"
+        },
+        "triple_double_quoted_fstring": {
+            "color": "#CD5555"
+        },
+        "triple_double_quoted_string": {
+            "color": "#CD5555"
+        },
+        "triple_single_quoted_fstring": {
+            "color": "#CD5555"
+        },
         "triple_single_quoted_string": {
             "color": "#CD5555"
         },
         "unclosed_string": {
-            "color": "#a61717",
-            "paper": "#e3d2d2"
-        },
-        "highlighted_identifier": {
-            "paper": "#ffffcc"
+            "background-color": "#e3d2d2",
+            "color": "#a61717"
         }
     },
     "settings": {
         "caret": "#000000",
         "color": "#000000",
-        "paper": "#eeeedd",
-        "name": "perldoc"
+        "name": "perldoc",
+        "paper": "#ffffff"
     }
 }
 

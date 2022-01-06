@@ -1,65 +1,84 @@
-#------------------------------------------------------------------------------
-# Copyright (c) 2017, Nucleic Development Team.
+#-----------------------------------------------------------------------------
+# Copyright (c) 2017-2022, Nucleic Development Team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
 # The full license is in the file LICENSE, distributed with this software.
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 
 MURPHY_THEME = {
     "python": {
-        "comment": {
-            "color": "#666666",
-            "font-style": "italic"
-        },
-        "single_quoted_string": {
-            "paper": "#e0e0ff"
-        },
         "class_name": {
             "color": "#ee99ee",
             "font-weight": "bold"
         },
-        "function_method_name": {
-            "color": "#55eedd",
-            "font-weight": "bold"
+        "comment": {
+            "color": "#666666",
+            "font-style": "italic"
         },
-        "operator": {
-            "color": "#333333"
-        },
-        "double_quoted_string": {
-            "paper": "#e0e0ff"
-        },
-        "triple_double_quoted_string": {
-            "paper": "#e0e0ff"
+        "comment_bock": {
+            "color": "#666666",
+            "font-style": "italic"
         },
         "decorator": {
             "color": "#555555",
             "font-weight": "bold"
         },
-        "comment_block": {
-            "color": "#666666",
-            "font-style": "italic"
+        "double_quoted_fstring": {
+            "background-color": "#e0e0ff"
+        },
+        "double_quoted_string": {
+            "background-color": "#e0e0ff"
+        },
+        "function_method_name": {
+            "color": "#55eedd",
+            "font-weight": "bold"
+        },
+        "highlighted_identifier": {
+            "color": "#007722"
+        },
+        "identifier": {
+            "color": "#003366"
         },
         "keyword": {
             "color": "#228899",
             "font-weight": "bold"
         },
+        "number": {
+            "color": "#6600EE",
+            "font-weight": "bold"
+        },
+        "operator": {
+            "color": "#333333"
+        },
+        "single_quoted_fstring": {
+            "background-color": "#e0e0ff"
+        },
+        "single_quoted_string": {
+            "background-color": "#e0e0ff"
+        },
+        "triple_double_quoted_fstring": {
+            "background-color": "#e0e0ff"
+        },
+        "triple_double_quoted_string": {
+            "background-color": "#e0e0ff"
+        },
+        "triple_single_quoted_fstring": {
+            "background-color": "#e0e0ff"
+        },
         "triple_single_quoted_string": {
-            "paper": "#e0e0ff"
+            "background-color": "#e0e0ff"
         },
         "unclosed_string": {
-            "color": "#FF0000",
-            "paper": "#FFAAAA"
-        },
-        "highlighted_identifier": {
-            "paper": "#ffffcc"
+            "background-color": "#FFAAAA",
+            "color": "#FF0000"
         }
     },
     "settings": {
         "caret": "#000000",
         "color": "#000000",
-        "paper": "#ffffff",
-        "name": "murphy"
+        "name": "murphy",
+        "paper": "#ffffff"
     }
 }
 

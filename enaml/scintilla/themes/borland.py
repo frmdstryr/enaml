@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2017-2021, Nucleic Development Team.
+# Copyright (c) 2017-2022, Nucleic Development Team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -12,15 +12,18 @@ BORLAND_THEME = {
             "color": "#008800",
             "font-style": "italic"
         },
-        "comment_block": {
+        "comment_bock": {
             "color": "#008800",
             "font-style": "italic"
         },
-        "default": {
-            "background": "#ffffff"
+        "double_quoted_fstring": {
+            "color": "#0000FF"
         },
         "double_quoted_string": {
             "color": "#0000FF"
+        },
+        "highlighted_identifier": {
+            "color": "#FF0000"
         },
         "keyword": {
             "color": "#000080",
@@ -29,13 +32,19 @@ BORLAND_THEME = {
         "number": {
             "color": "#0000FF"
         },
-        "operator": {
-            "font-weight": "bold"
+        "single_quoted_fstring": {
+            "color": "#0000FF"
         },
         "single_quoted_string": {
             "color": "#0000FF"
         },
+        "triple_double_quoted_fstring": {
+            "color": "#0000FF"
+        },
         "triple_double_quoted_string": {
+            "color": "#0000FF"
+        },
+        "triple_single_quoted_fstring": {
             "color": "#0000FF"
         },
         "triple_single_quoted_string": {

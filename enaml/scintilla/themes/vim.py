@@ -1,59 +1,77 @@
-#------------------------------------------------------------------------------
-# Copyright (c) 2017, Nucleic Development Team.
+#-----------------------------------------------------------------------------
+# Copyright (c) 2017-2022, Nucleic Development Team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
 # The full license is in the file LICENSE, distributed with this software.
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 
 VIM_THEME = {
     "python": {
+        "class_name": {
+            "color": "#cccccc"
+        },
         "comment": {
             "color": "#000080"
         },
-        "single_quoted_string": {
+        "comment_bock": {
+            "color": "#000080"
+        },
+        "decorator": {
+            "color": "#cccccc"
+        },
+        "double_quoted_fstring": {
             "color": "#cd0000"
         },
-        "class_name": {
-            "color": "#00cdcd"
+        "double_quoted_string": {
+            "color": "#cd0000"
         },
         "function_method_name": {
             "color": "#cccccc"
         },
+        "highlighted_identifier": {
+            "color": "#cd00cd"
+        },
+        "identifier": {
+            "color": "#00cdcd"
+        },
+        "keyword": {
+            "color": "#cdcd00"
+        },
+        "number": {
+            "color": "#cd00cd"
+        },
         "operator": {
             "color": "#3399cc"
         },
-        "double_quoted_string": {
+        "single_quoted_fstring": {
+            "color": "#cd0000"
+        },
+        "single_quoted_string": {
+            "color": "#cd0000"
+        },
+        "triple_double_quoted_fstring": {
             "color": "#cd0000"
         },
         "triple_double_quoted_string": {
             "color": "#cd0000"
         },
-        "decorator": {
-            "color": "#cccccc"
-        },
-        "comment_block": {
-            "color": "#000080"
-        },
-        "keyword": {
-            "color": "#cdcd00"
+        "triple_single_quoted_fstring": {
+            "color": "#cd0000"
         },
         "triple_single_quoted_string": {
             "color": "#cd0000"
         },
         "unclosed_string": {
-            "color": "#cccccc",
-            "border": "1px solid #FF0000"
-        },
-        "highlighted_identifier": {
-            "paper": "#222222"
+            "border": "1px solid #FF0000",
+            "color": "#cccccc"
         }
     },
     "settings": {
-        "caret": "#cccccc",
-        "color": "#cccccc",
-        "paper": "#000000",
-        "name": "vim"
+        "caret": "#000000",
+        "color": "#000000",
+        "name": "vim",
+        "paper": "#ffffff"
     }
 }
 
