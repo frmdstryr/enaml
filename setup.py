@@ -1,17 +1,17 @@
 #------------------------------------------------------------------------------
-# Copyright (c) 2013-2022, Nucleic Development Team.
+# Copyright (c) 2013-2021, Nucleic Development Team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
 # The full license is in the file LICENSE, distributed with this software.
 #------------------------------------------------------------------------------
+import os
 import sys
-import inspect
-from setuptools import Extension, setup
-from setuptools.command.install import install
-from setuptools.command.develop import develop
+from setuptools import find_packages, Extension, setup
+from setuptools.command.build_ext import build_ext
 
-from cppy import CppyBuildExt
+sys.path.insert(0, os.path.abspath('.'))
+from enaml.version import __version__
 
 # Use the env var ENAML_DISABLE_FH4 to disable linking against VCRUNTIME140_1.dll
 
@@ -123,13 +123,12 @@ setup(
           'License :: OSI Approved :: BSD License',
           'Programming Language :: Python',
           'Programming Language :: Python :: 3',
-          'Programming Language :: Python :: 3.7',
           'Programming Language :: Python :: 3.8',
           'Programming Language :: Python :: 3.9',
           'Programming Language :: Python :: 3.10',
           'Programming Language :: Python :: Implementation :: CPython',
       ],
-    python_requires='>=3.7',
+    python_requires='>=3.8',
     requires=['atom', 'qtpy', 'pegen', 'kiwisolver'],
     install_requires=['atom>=0.7.0',
                       'kiwisolver>=1.2.0',
