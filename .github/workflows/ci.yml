@@ -55,9 +55,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
+        # Skip pegen deps because of https://github.com/we-like-parsers/pegen/issues/53
         run: |
           python -m pip install --upgrade pip
-          pip install numpy
+          pip install git+https://github.com/we-like-parsers/pegen --no-deps
+>>>>>>> 19a07f32 (cis: try to get cis minimally run)
           pip install git+https://github.com/MatthieuDartiailh/bytecode@main
           pip install git+https://github.com/nucleic/atom@main
           pip install git+https://github.com/nucleic/kiwi@main
