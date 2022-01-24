@@ -159,5 +159,5 @@ setup(
         'enaml-compileall = enaml.compile_all:main',
     ]},
     ext_modules=ext_modules,
-    cmdclass={'build_ext': CppyBuildExt},
+    cmdclass={'build_ext': BuildExt},
 )
