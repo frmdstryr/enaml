@@ -167,7 +167,7 @@ ENAML_TOKENS['root'] = [
     TEMPLATE_START,
     TEMPLATEINST_START,
     CHILDDEF_START,
-    (r'(alias|attr|const|event)\b', Keyword),
+    (r'(alias|attr|const|event|func)\b', Keyword),
     (r':=', Operator),
 ] + ENAML_TOKENS['root']
 
