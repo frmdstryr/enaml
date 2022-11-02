@@ -28,7 +28,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
 ]
 dependencies = [
-    "ply",
+    "pegen",
     "atom>=0.8.0",
     "kiwisolver>=1.2.0",
     "bytecode>=0.13.0",
