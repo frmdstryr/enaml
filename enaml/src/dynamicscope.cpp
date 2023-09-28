@@ -842,7 +842,7 @@ namespace
 int
 dynamicscope_modexec( PyObject *mod )
 {
-    parent_str = PyUnicode_FromString( "_parent" );
+    parent_str = PyUnicode_FromString( "parent" );
     if( !parent_str )
     {
         return -1;

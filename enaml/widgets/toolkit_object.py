@@ -5,7 +5,7 @@
 #
 # The full license is in the file LICENSE, distributed with this software.
 #------------------------------------------------------------------------------
-from atom.api import Atom, Event, Typed, ForwardTyped
+from atom.api import Atom, Event, Typed, ForwardTyped, Value
 
 from enaml.application import Application
 from enaml.core.declarative import Declarative, d_
@@ -27,7 +27,10 @@ class ProxyToolkitObject(Atom):
 
     """
     #: A reference to the ToolkitObject declaration.
-    declaration = ForwardTyped(lambda: ToolkitObject)
+    declaration = property(lambda self: self._declaration() if self._declaration else None)
+
+    # TODO: Add typed checked atomref member ForwardTyped(lambda: ToolkitObject)
+    _declaration = Value()
 
     @property
     def is_active(self):
@@ -62,7 +65,7 @@ class ProxyToolkitObject(Atom):
         is required.
 
         """
-        del self.declaration
+        del self._declaration
 
     def parent(self):
         """ Get the parent proxy object for this object.

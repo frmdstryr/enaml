@@ -11,7 +11,7 @@ from threading import Lock
 
 from atom.api import (
     Atom, Bool, Typed, ForwardTyped, Tuple, Dict, Callable, Value, List,
-    observe
+    observe, atomref
 )
 
 
@@ -368,7 +368,7 @@ class Application(Atom):
         """
         cls = self.resolve_proxy_class(type(declaration))
         if cls is not None:
-            return cls(declaration=declaration)
+            return cls(_declaration=atomref(declaration))
         msg = "could not resolve a toolkit implementation for the '%s' "
         msg += "component when running under a '%s'"
         d_name = type(declaration).__name__

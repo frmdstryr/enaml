@@ -8,7 +8,7 @@
 from collections import deque
 import re
 
-from atom.api import Atom, Str, Value, List, Event
+from atom.api import Atom, Str, Value, List, Event, atomref
 
 
 def flag_generator():
@@ -59,7 +59,7 @@ class Object(Atom):
     #: The read-only property which returns the object parent. This will
     #: be an Object or None. Use 'set_parent()' or pass the parent to
     #: the constructor to set the parent of an object.
-    parent = property(lambda self: self._parent)
+    parent = property(lambda self: self._parent() if self._parent else None)
 
     #: A read-only property which returns the object children. This is
     #: a list of Object instances. User code should not modify the list
@@ -77,7 +77,7 @@ class Object(Atom):
 
     #: Private storage values. These should *never* be manipulated by
     #: user code. For performance reasons, these are not type checked.
-    _parent = Value()   # Object or None
+    _parent = Value()   # atomref(Object) or None
     _children = List()  # list of Object
     _flags = Value(0)   # object flags
 
@@ -99,6 +99,11 @@ class Object(Atom):
         if parent is not None:
             self.set_parent(parent)
 
+    def __del__(self):
+        # Make sure destroy is always called
+        if not self.is_destroyed:
+            self.destroy()
+
     def destroy(self):
         """ Destroy this object and all of its children recursively.
 
@@ -113,10 +118,10 @@ class Object(Atom):
         for child in self._children:
             child.destroy()
         del self._children
-        parent = self._parent
+        parent = self.parent
         if parent is not None:
             if parent.is_destroyed:
-                self._parent = None
+                del self._parent
             else:
                 self.set_parent(None)
 
@@ -143,14 +148,17 @@ class Object(Atom):
         the object as needed, if it is reparented dynamically at runtime.
 
         """
-        old_parent = self._parent
+        old_parent = self.parent
         if parent is old_parent:
             return
         if parent is self:
             raise ValueError('cannot use `self` as Object parent')
         if parent is not None and not isinstance(parent, Object):
             raise TypeError('parent must be an Object or None')
-        self._parent = parent
+        if parent is None:
+            del self._parent
+        else:
+            self._parent = atomref(parent)
         self.parent_changed(old_parent, parent)
         if old_parent is not None:
             old_parent._children.remove(self)
@@ -213,9 +221,9 @@ class Object(Atom):
             new.extend(insert_list)
 
         for child in insert_list:
-            old_parent = child._parent
+            old_parent = child.parent
             if old_parent is not self:
-                child._parent = self
+                child._parent = atomref(self)
                 child.parent_changed(old_parent, self)
                 if old_parent is not None:
                     old_parent.child_removed(child)
@@ -300,8 +308,11 @@ class Object(Atom):
 
         """
         obj = self
-        while obj._parent is not None:
-            obj = obj._parent
+        while True:
+            parent = obj.parent
+            if parent is None:
+                return obj
+            obj = parent
         return obj
 
     def traverse(self, depth_first=False):
@@ -336,10 +347,10 @@ class Object(Atom):
             The object at which to stop traversal. Defaults to None.
 
         """
-        parent = self._parent
+        parent = self.parent
         while parent is not root and parent is not None:
             yield parent
-            parent = parent._parent
+            parent = parent.parent
 
     def find(self, name, regex=False):
         """ Find the first object in the subtree with the given name.
