@@ -9,6 +9,7 @@
 # the header of python grammar DO NOT EDIT
 
 import ast
+import codecs
 import enum
 import sys
 import tokenize
@@ -271,12 +272,20 @@ class BasePythonParser(Parser):
                 if ss:
                     values.append(self._concat_strings_in_constant(ss))
                     ss.clear()
-                values.extend(p.values)
+                for v in p.values:
+                    if isinstance(v, ast.Constant):
+                        v.value = codecs.decode(v.value, "unicode_escape")
+                        values.append(v)
+                    else:
+                        values.append(v)
             else:
                 ss.append(p)
 
         if ss:
             values.append(self._concat_strings_in_constant(ss))
+
+        if not seen_joined and len(values) == 1 and isinstance(values[0], ast.Constant):
+            return values[0]
 
         consolidated = []
         for p in values:
@@ -291,16 +300,13 @@ class BasePythonParser(Parser):
             else:
                 consolidated.append(p)
 
-        if not seen_joined and len(values) == 1 and isinstance(values[0], ast.Constant):
-            return values[0]
-        else:
-            return ast.JoinedStr(
-                values=consolidated,
-                lineno=start[0] if start else values[0].lineno,
-                col_offset=start[1] if start else values[0].col_offset,
-                end_lineno=end[0] if end else values[-1].end_lineno,
-                end_col_offset=end[1] if end else values[-1].end_col_offset,
-            )
+        return ast.JoinedStr(
+            values=consolidated,
+            lineno=start[0] if start else values[0].lineno,
+            col_offset=start[1] if start else values[0].col_offset,
+            end_lineno=end[0] if end else values[-1].end_lineno,
+            end_col_offset=end[1] if end else values[-1].end_col_offset,
+        )
 
     def generate_ast_for_string(self, tokens):
         """Generate AST nodes for strings."""
