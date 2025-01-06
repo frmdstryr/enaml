@@ -65,6 +65,11 @@ ext_modules = [
         ['enaml/src/subscription_observer.cpp'],
         language='c++',
     ),
+    Extension(
+        'enaml.core.standard_tracer',
+        ['enaml/src/standard_tracer.cpp'],
+        language='c++',
+    ),
 ]
 
 
