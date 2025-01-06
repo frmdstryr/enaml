@@ -49,7 +49,7 @@ SubscriptionObserver_new( PyTypeObject* type, PyObject* args, PyObject* kwargs )
     PyObject* owner;
     PyObject* name;
     static char* kwlist[] = { "owner", "name", 0 };
-    if( !PyArg_ParseTupleAndKeywords( args, kwargs, "O|U", kwlist, &owner, &name ) )
+    if( !PyArg_ParseTupleAndKeywords( args, kwargs, "OU", kwlist, &owner, &name ) )
     {
         return 0;
     }
