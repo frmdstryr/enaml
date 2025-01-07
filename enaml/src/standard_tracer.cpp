@@ -21,6 +21,11 @@
 namespace enaml
 {
 
+static cppy::ptr atomref;
+static cppy::ptr getattr;
+static cppy::ptr Atom;
+static cppy::ptr Alias;
+
 // POD struct - all member fields are considered private
 struct StandardTracer
 {
@@ -55,6 +60,8 @@ struct SubscriptionObserver
 
 namespace {
 
+
+
 PyObject*
 SubscriptionObserver_new( PyTypeObject* type, PyObject* args, PyObject* kwargs )
 {
@@ -69,19 +76,6 @@ SubscriptionObserver_new( PyTypeObject* type, PyObject* args, PyObject* kwargs )
         return 0;
 
     SubscriptionObserver* self = reinterpret_cast<SubscriptionObserver*>( ptr.get() );
-
-    cppy::ptr atom_api( PyImport_ImportModule("atom.api") );
-    if ( !atom_api )
-    {
-        PyErr_SetString( PyExc_ImportError, "Could not import atom.api" );
-        return 0;
-    }
-    cppy::ptr atomref( atom_api.getattr("atomref") );
-    if ( !atomref )
-    {
-        PyErr_SetString( PyExc_ImportError, "Could not import atom.api.atomref" );
-        return 0;
-    }
 
     self->atomref = PyObject_CallOneArg(atomref.get(), owner);
     if( !self->atomref )
@@ -337,19 +331,6 @@ StandardTracer_dealloc( StandardTracer* self )
 
 static bool is_alias( PyObject* obj )
 {
-    cppy::ptr alias_module( PyImport_ImportModule("enaml.core.alias") );
-    if ( !alias_module )
-    {
-        PyErr_SetString( PyExc_ImportError, "Could not import enaml.core.alias" );
-        return 0;
-    }
-    cppy::ptr Alias( alias_module.getattr("Alias") );
-    if ( !Alias )
-    {
-        PyErr_SetString( PyExc_ImportError, "Could not import enaml.core.alias.Alias" );
-        return 0;
-    }
-
     const int r =  PyObject_IsInstance( obj, Alias.get() );
     if (r < 0 )
     {
@@ -361,19 +342,6 @@ static bool is_alias( PyObject* obj )
 
 static bool is_atom_instance( PyObject* obj )
 {
-    cppy::ptr atom_api( PyImport_ImportModule("atom.api") );
-    if ( !atom_api )
-    {
-        PyErr_SetString( PyExc_ImportError, "Could not import atom.api" );
-        return 0;
-    }
-    cppy::ptr Atom( atom_api.getattr("Atom") );
-    if ( !Atom )
-    {
-        PyErr_SetString( PyExc_ImportError, "Could not import atom.api.Atom" );
-        return 0;
-    }
-
     const int r =  PyObject_IsInstance( obj, Atom.get() );
     if (r < 0 )
     {
@@ -386,18 +354,6 @@ static bool is_atom_instance( PyObject* obj )
 
 static bool is_getattr( PyObject* obj )
 {
-    cppy::ptr builtins( PyImport_ImportModule("builtins") );
-    if ( !builtins )
-    {
-        PyErr_SetString( PyExc_ImportError, "Could not import builtins" );
-        return 0;
-    }
-    cppy::ptr getattr( builtins.getattr("getattr") );
-    if ( !getattr )
-    {
-        PyErr_SetString( PyExc_ImportError, "Could not import builtins.getattr" );
-        return 0;
-    }
     return obj == getattr;
 }
 
@@ -848,6 +804,54 @@ standard_tracer_modexec( PyObject *mod )
     if( !StandardTracer::Ready() || !SubscriptionObserver::Ready() )
         return -1;
 
+
+    cppy::ptr atom_api( PyImport_ImportModule("atom.api") );
+    if ( !atom_api )
+    {
+        PyErr_SetString( PyExc_ImportError, "Could not import atom.api" );
+        return -1;
+    }
+    atomref.set( atom_api.getattr("atomref") );
+    if ( !atomref )
+    {
+        PyErr_SetString( PyExc_ImportError, "Could not import atom.api.atomref" );
+        return 0;
+    }
+
+    Atom.set( atom_api.getattr("Atom") );
+    if ( !Atom )
+    {
+        PyErr_SetString( PyExc_ImportError, "Could not import atom.api.Atom" );
+        return 0;
+    }
+
+    cppy::ptr builtins( PyImport_ImportModule("builtins") );
+    if ( !builtins )
+    {
+        PyErr_SetString( PyExc_ImportError, "Could not import builtins" );
+        return -1;
+    }
+
+    getattr.set( builtins.getattr("getattr") );
+    if ( !getattr )
+    {
+        PyErr_SetString( PyExc_ImportError, "Could not import builtins.getattr" );
+        return 0;
+    }
+
+    cppy::ptr enaml_core_alias( PyImport_ImportModule("enaml.core.alias") );
+    if ( !enaml_core_alias )
+    {
+        PyErr_SetString( PyExc_ImportError, "Could not import enaml.core.Alias" );
+        return -1;
+    }
+    Alias.set( enaml_core_alias.getattr("Alias") );
+    if ( !Alias )
+    {
+        PyErr_SetString( PyExc_ImportError, "Could not import enaml.core.alias.Alias" );
+        return 0;
+    }
+
     cppy::ptr standard_tracer( pyobject_cast(  StandardTracer::TypeObject ) );
     if( PyModule_AddObject( mod, "StandardTracer", standard_tracer.get() ) < 0 )
         return -1;
@@ -857,7 +861,6 @@ standard_tracer_modexec( PyObject *mod )
     if( PyModule_AddObject( mod, "SubscriptionObserver", subscription_observer.get() ) < 0 )
         return -1;
     subscription_observer.release();
-
 
     return 0;
 }
