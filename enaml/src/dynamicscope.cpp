@@ -785,6 +785,14 @@ DynamicScope_contains( DynamicScope* self, PyObject* key )
 }
 
 
+PyObject*
+DynamicScope_iter( DynamicScope* self)
+{
+   cppy::ptr locals( cppy::incref(self->f_locals) );
+   return locals.iter();
+}
+
+
 static PyMethodDef DynamicScope_methods[] = {
     {"get",    reinterpret_cast<PyCFunction>(DynamicScope_get), METH_VARARGS, ""},
     { 0 }  // Sentinel
@@ -801,6 +809,7 @@ static PyType_Slot DynamicScope_Type_slots[] = {
     { Py_mp_subscript, void_cast( DynamicScope_getitem ) },      /* mp_subscript */
     { Py_mp_ass_subscript, void_cast( DynamicScope_setitem ) },  /* mp_ass_subscript */
     { Py_sq_contains, void_cast( DynamicScope_contains ) },      /* sq_contains */
+    { Py_tp_iter, void_cast( DynamicScope_iter ) },              /* tp_iter */
     { 0, 0 },
 };
 
