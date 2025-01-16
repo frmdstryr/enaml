@@ -21,10 +21,10 @@
 namespace enaml
 {
 
-static cppy::ptr atomref;
-static cppy::ptr getattr;
-static cppy::ptr Atom;
-static cppy::ptr Alias;
+static PyObject* atomref;
+static PyObject* getattr;
+static PyObject* Atom;
+static PyObject* Alias;
 
 // POD struct - all member fields are considered private
 struct StandardTracer
@@ -77,7 +77,7 @@ SubscriptionObserver_new( PyTypeObject* type, PyObject* args, PyObject* kwargs )
 
     SubscriptionObserver* self = reinterpret_cast<SubscriptionObserver*>( ptr.get() );
 
-    self->atomref = PyObject_CallOneArg(atomref.get(), owner);
+    self->atomref = PyObject_CallOneArg(atomref, owner);
     if( !self->atomref )
         return 0;
     self->name =  cppy::incref( name );
@@ -97,11 +97,6 @@ int
 SubscriptionObserver_traverse( SubscriptionObserver* self, visitproc visit, void* arg )
 {
     Py_VISIT( self->atomref );
-    Py_VISIT( self->name );
-    #if PY_VERSION_HEX >= 0x03090000
-    // This was not needed before Python 3.9 (Python issue 35810 and 40217)
-    Py_VISIT(Py_TYPE(self));
-    #endif
     return 0;
 }
 
@@ -137,43 +132,25 @@ SubscriptionObserver_call( SubscriptionObserver* self, PyObject* args, PyObject*
     if( PyObject_IsTrue( self->atomref ) )
     {
         cppy::ptr owner( PyObject_CallNoArgs( self->atomref ) );
+        if ( !owner )
+            return 0;
         cppy::ptr engine( owner.getattr("_d_engine") );
         if ( !engine )
             return 0;
         if ( !engine.is_none() )
         {
-            cppy::ptr args( PyTuple_New( 2 ) );
-            if( !args )
+            cppy::ptr update_args( PyTuple_New( 2 ) );
+            if( !update_args )
                 return 0;
-            PyTuple_SET_ITEM( args.get(), 0, cppy::incref( owner.get() ) );
-            PyTuple_SET_ITEM( args.get(), 1, cppy::incref( self->name ) );
+            PyTuple_SET_ITEM( update_args.get(), 0, cppy::incref( owner.get() ) );
+            PyTuple_SET_ITEM( update_args.get(), 1, cppy::incref( self->name ) );
             cppy::ptr update( engine.getattr( "update" ) );
-            return update.call( args );
+            if( !update )
+                return 0;
+            return update.call( update_args );
         }
     }
     Py_RETURN_NONE;
-}
-
-
-PyObject*
-SubscriptionObserver_richcompare( SubscriptionObserver* self, PyObject* other, int opid )
-{
-    if( opid == Py_EQ )
-    {
-        if( SubscriptionObserver::TypeCheck( other ) )
-        {
-            SubscriptionObserver* so_other = reinterpret_cast<SubscriptionObserver*>( other );
-            if(
-                PyObject_RichCompareBool( self->atomref, so_other->atomref, Py_EQ )
-                && PyObject_RichCompareBool( self->name, so_other->name, Py_EQ )
-            )
-            {
-                Py_RETURN_TRUE;
-            }
-        }
-        Py_RETURN_FALSE;
-    }
-    Py_RETURN_NOTIMPLEMENTED;
 }
 
 
@@ -198,10 +175,9 @@ SubscriptionObserver_get_ref( SubscriptionObserver* self, void* context )
 PyObject*
 SubscriptionObserver_set_ref( SubscriptionObserver* self, PyObject* value, void* context )
 {
-    if( reinterpret_cast<PyObject*>( self ) == value )
-        return 0;
-    cppy::ptr old( self->atomref );
-    self->atomref = cppy::incref( value );
+    if( value != Py_None )
+        return cppy::type_error("ref can only be set to None");
+    cppy::replace( &self->atomref, Py_None );
     return 0;
 }
 
@@ -229,7 +205,6 @@ static PyType_Slot SubscriptionObserver_Type_slots[] = {
     { Py_tp_clear, void_cast( SubscriptionObserver_clear ) },              /* tp_clear */
     { Py_tp_call, void_cast( SubscriptionObserver_call ) },                /* tp_call */
     { Py_tp_doc, cast_py_tp_doc( SubscriptionObserver__doc__ ) },          /* tp_doc */
-    { Py_tp_richcompare, void_cast( SubscriptionObserver_richcompare ) },  /* tp_richcompare */
     { Py_nb_bool, void_cast( SubscriptionObserver__bool__ ) },             /* nb_bool */
     { Py_tp_getset, void_cast( SubscriptionObserver_getset ) },            /* tp_getset */
     { Py_tp_new, void_cast( SubscriptionObserver_new ) },                  /* tp_new */
@@ -331,7 +306,7 @@ StandardTracer_dealloc( StandardTracer* self )
 
 static bool is_alias( PyObject* obj )
 {
-    const int r =  PyObject_IsInstance( obj, Alias.get() );
+    const int r =  PyObject_IsInstance( obj, Alias );
     if (r < 0 )
     {
         PyErr_Clear();
@@ -342,7 +317,7 @@ static bool is_alias( PyObject* obj )
 
 static bool is_atom_instance( PyObject* obj )
 {
-    const int r =  PyObject_IsInstance( obj, Atom.get() );
+    const int r =  PyObject_IsInstance( obj, Atom );
     if (r < 0 )
     {
         PyErr_Clear();
@@ -373,12 +348,10 @@ static bool is_getattr( PyObject* obj )
 PyObject*
 _StandardTracer_trace_atom_internal( StandardTracer* self, PyObject* obj, PyObject* name )
 {
-    cppy::ptr objptr( cppy::incref(obj) );
-    cppy::ptr nameptr( cppy::incref(name) );
-    cppy::ptr get_member( objptr.getattr("get_member") );
+    cppy::ptr get_member( PyObject_GetAttrString( obj, "get_member") );
     if ( !get_member )
         return 0;
-    cppy::ptr member( PyObject_CallOneArg( get_member.get(), nameptr.get() ) );
+    cppy::ptr member( PyObject_CallOneArg( get_member.get(), name ) );
     if ( !member )
         return 0;
     if ( !member.is_none() )
@@ -386,8 +359,8 @@ _StandardTracer_trace_atom_internal( StandardTracer* self, PyObject* obj, PyObje
         cppy::ptr item( PyTuple_New (2) );
         if( !item )
             return 0;
-        PyTuple_SET_ITEM( item.get(), 0, cppy::incref( objptr.get() ) );
-        PyTuple_SET_ITEM( item.get(), 1, cppy::incref( nameptr.get() ) );
+        PyTuple_SET_ITEM( item.get(), 0, cppy::incref( obj ) );
+        PyTuple_SET_ITEM( item.get(), 1, cppy::incref( name ) );
         if ( PySet_Add( self->items, item.get()) )
             return 0;
     }
@@ -395,34 +368,38 @@ _StandardTracer_trace_atom_internal( StandardTracer* self, PyObject* obj, PyObje
         cppy::ptr objtype( PyObject_Type( obj ) );
         if ( !objtype )
             return 0;
-        cppy::ptr aliasptr( objtype.getattr( nameptr.get() ) );
-        if ( !aliasptr )
+        cppy::ptr aliasptr( objtype.getattr( name ) );
+        if ( !aliasptr && PyErr_Occurred() )
             PyErr_Clear(); // getattr(type(obj), name) is None
         else if ( is_alias( aliasptr.get() ) ) {
             cppy::ptr resolve = aliasptr.getattr("resolve");
-            cppy::ptr alias_result( PyObject_CallOneArg( resolve.get(), objptr.get() ) );
-            if ( !alias_result
-                || !PyTuple_Check(alias_result.get())
-                || PyTuple_Size(alias_result.get()) != 2 )
+            if ( !resolve )
                 return 0;
-            cppy::ptr alias_obj( cppy::incref( PyTuple_GET_ITEM(alias_result.get(), 0)) );
-            cppy::ptr alias_attr( cppy::incref( PyTuple_GET_ITEM(alias_result.get(), 1)) );
-            if ( !alias_attr.is_none() )
-                return _StandardTracer_trace_atom_internal(self, alias_obj.get(), alias_attr.get());
+            cppy::ptr alias_result( PyObject_CallOneArg( resolve.get(), obj ) );
+            if ( !alias_result )
+                return 0;
+            if ( !PyTuple_Check(alias_result.get()) || PyTuple_GET_SIZE(alias_result.get()) != 2 )
+                return cppy::type_error("alias resolve should return tuple of (obj, attr");
+            PyObject* alias_obj = PyTuple_GET_ITEM( alias_result.get(), 0 );
+            PyObject* alias_attr = PyTuple_GET_ITEM( alias_result.get(), 1 );
+            if ( alias_attr != Py_None )
+                return _StandardTracer_trace_atom_internal(self, alias_obj, alias_attr);
         }
     }
     Py_RETURN_NONE;
 }
 
 PyObject*
-StandardTracer_trace_atom( StandardTracer* self, PyObject* args, PyObject* kwargs )
+StandardTracer_trace_atom( StandardTracer* self, PyObject *const *args, Py_ssize_t nargs )
 {
-    PyObject* obj;
-    PyObject* name;
-    static char* kwlist[] = { "obj", "name", 0 };
-    if( !PyArg_ParseTupleAndKeywords( args, kwargs, "OU", kwlist, &obj, &name ) )
-        return 0;
-    return _StandardTracer_trace_atom_internal(self, obj, name);
+    // obj, attr
+    if ( nargs != 2 )
+        return cppy::type_error("trace_atom requires 2 args: obj, attr");
+    if ( !is_atom_instance( args[0] ) )
+        return cppy::type_error("trace_atom first argument must be an atom instance");
+    if ( !PyUnicode_Check( args[1] ) )
+        return cppy::type_error("trace_atom first argument must be a str");
+    return _StandardTracer_trace_atom_internal(self, args[0], args[1]);
 }
 
 /*
@@ -443,51 +420,52 @@ StandardTracer_trace_atom( StandardTracer* self, PyObject* args, PyObject* kwarg
 PyObject*
 StandardTracer_finalize( StandardTracer* self )
 {
-    cppy::ptr owner( cppy::incref(self->owner) );
-    cppy::ptr key( cppy::incref(self->key) );
-    cppy::ptr storage( owner.getattr("_d_storage") );
+    cppy::ptr storage( PyObject_GetAttrString( self->owner, "_d_storage") );
     if ( !storage )
         return 0;
 
     // invalidate the old observer so that it can be collected
-    cppy::ptr old_observer( PyObject_GetItem( storage.get(), key.get() ) );
-    if ( !old_observer )
+    cppy::ptr old_observer( PyObject_GetItem( storage.get(), self->key ) );
+    if ( !old_observer && PyErr_Occurred() )
         PyErr_Clear();
     else
-        old_observer.setattr("ref", cppy::incref(Py_None));
+        old_observer.setattr("ref", Py_None);
 
-    cppy::ptr items( cppy::incref(self->items) );
-    if ( items.is_truthy() )
+    if ( PyObject_IsTrue( self->items ) )
     {
         cppy::ptr observer_args( PyTuple_New (2) );
         if( !observer_args )
             return 0;
-        PyTuple_SET_ITEM( observer_args.get(), 0, cppy::incref( owner.get() ) );
+        PyTuple_SET_ITEM( observer_args.get(), 0, cppy::incref( self->owner ) );
         PyTuple_SET_ITEM( observer_args.get(), 1, cppy::incref( self->name ) );
 
         cppy::ptr observer( PyObject_Call( pyobject_cast(SubscriptionObserver::TypeObject), observer_args.get(), 0 ) );
         if ( !observer )
             return 0;
 
-        PyObject_SetItem( storage.get(), key.get(), observer.get() ); // pass ownership to storage
+        if ( PyObject_SetItem( storage.get(), self->key, observer.get() ) )
+            return 0;
 
         cppy::ptr item;
-        cppy::ptr iter( items.iter() );
+        cppy::ptr iter( PyObject_GetIter( self->items ) );
+        if ( !iter )
+            return 0;
 
         while ( (item = iter.next())  )
         {
-            if ( !PyTuple_Check(item.get()) || PyTuple_Size(item.get()) != 2 )
+            if ( !PyTuple_Check(item.get()) || PyTuple_GET_SIZE(item.get()) != 2 )
+                return cppy::type_error("StandardTracer items should be a tuple of (obj, d_name)");
+            PyObject* obj = PyTuple_GET_ITEM(item.get(), 0);
+            PyObject* d_name = PyTuple_GET_ITEM(item.get(), 1);
+            cppy::ptr observe( PyObject_GetAttrString( obj, "observe" ) );
+            if( !observe )
                 return 0;
-            cppy::ptr obj( cppy::incref( PyTuple_GET_ITEM(item.get(), 0) ) );
-            cppy::ptr d_name( cppy::incref( PyTuple_GET_ITEM(item.get(), 1) ) );
             cppy::ptr args( PyTuple_New (2) );
             if( !args )
                 return 0;
-            PyTuple_SET_ITEM( args.get(), 0, cppy::incref( d_name.get() ) );
+            PyTuple_SET_ITEM( args.get(), 0, cppy::incref( d_name ) );
             PyTuple_SET_ITEM( args.get(), 1, cppy::incref( observer.get() ) );
-            cppy::ptr observe( obj.getattr("observe") );
-            if( !observe )
-                return 0;
+
             cppy::ptr result( observe.call( args ) );
             if ( !result )
                 return 0;
@@ -498,50 +476,39 @@ StandardTracer_finalize( StandardTracer* self )
 
 
 PyObject*
-StandardTracer_dyanmic_load( StandardTracer* self, PyObject* args, PyObject* kwargs  )
+StandardTracer_dyanmic_load( StandardTracer* self, PyObject*const *args, Py_ssize_t nargs )
 {
-    PyObject* obj;
-    PyObject* attr;
-    PyObject* value;
-    static char* kwlist[] = { "obj", "attr", "value", 0 };
-    if( !PyArg_ParseTupleAndKeywords( args, kwargs, "OUO", kwlist, &obj, &attr, &value ) )
-        return 0;
-    if ( is_atom_instance( obj ) )
-        return _StandardTracer_trace_atom_internal( self, obj, attr );
+    if ( nargs != 3 )
+        return cppy::type_error("dyanmic_load requires 3 args: obj, attr, value");
+    if ( is_atom_instance( args[0] ) && PyUnicode_Check( args[1] ) )
+        return _StandardTracer_trace_atom_internal( self, args[0], args[1] );
     Py_RETURN_NONE;
 }
 
 
 PyObject*
-StandardTracer_load_attr( StandardTracer* self, PyObject* args, PyObject* kwargs  )
+StandardTracer_load_attr( StandardTracer* self, PyObject*const *args, Py_ssize_t nargs )
 {
-    PyObject* obj;
-    PyObject* attr;
-    static char* kwlist[] = { "obj", "attr", 0 };
-    if( !PyArg_ParseTupleAndKeywords( args, kwargs, "OU", kwlist, &obj, &attr ) )
-        return 0;
-    if ( is_atom_instance( obj ) )
-        return _StandardTracer_trace_atom_internal( self, obj, attr );
+    if ( nargs != 2 )
+        return cppy::type_error("load_attr requires 2 args: obj, attr");
+    if ( is_atom_instance( args[0] ) && PyUnicode_Check( args[1] ) )
+        return _StandardTracer_trace_atom_internal( self, args[0], args[1] );
     Py_RETURN_NONE;
 }
 
 
 PyObject*
-StandardTracer_call_function( StandardTracer* self, PyObject* args, PyObject* kwargs  )
+StandardTracer_call_function( StandardTracer* self, PyObject*const *args, Py_ssize_t nargs  )
 {
-    PyObject* func;
-    PyObject* argtuple;
-    PyObject* argspec;
-    static char* kwlist[] = { "func", "argtuple", "argspec", 0 };
-    if( !PyArg_ParseTupleAndKeywords( args, kwargs, "OOi", kwlist, &func, &argtuple, &argspec ) )
-        return 0;
-    if ( is_getattr( func ) && PyTuple_Check(argtuple) && PyTuple_Size(argtuple) >= 2 )
+    if ( nargs != 3 )
+        return cppy::type_error("call_function requires 3 args: func, argtuple, argspec");
+    PyObject* argtuple = args[1];
+    if ( is_getattr( args[0] ) && PyTuple_Check(argtuple) && PyTuple_GET_SIZE(argtuple) >= 2 )
     {
-        cppy::ptr obj( cppy::incref( PyTuple_GET_ITEM(argtuple, 0) ) );
-        cppy::ptr attr( cppy::incref( PyTuple_GET_ITEM(argtuple, 1) ) );
-        if ( is_atom_instance( obj.get() ) && PyUnicode_Check( attr.get() ) )
-            return _StandardTracer_trace_atom_internal( self, obj.get(), attr.get() );
-
+        PyObject* obj = PyTuple_GET_ITEM(argtuple, 0);
+        PyObject* attr = PyTuple_GET_ITEM(argtuple, 1);
+        if ( is_atom_instance( obj ) && PyUnicode_Check( attr ) )
+            return _StandardTracer_trace_atom_internal( self, obj, attr );
     }
 
     Py_RETURN_NONE;
@@ -549,7 +516,7 @@ StandardTracer_call_function( StandardTracer* self, PyObject* args, PyObject* kw
 
 
 PyObject*
-StandardTracer_binary_subscr( StandardTracer* self, PyObject* args, PyObject*kwargs )
+StandardTracer_binary_subscr( StandardTracer* self, PyObject*const *args, Py_ssize_t nargs )
 {
     Py_RETURN_NONE;
 }
@@ -598,14 +565,12 @@ StandardTracer_get_owner( StandardTracer* self, void* context )
     return cppy::incref( self->owner );
 }
 
-
 PyObject*
 StandardTracer_set_owner( StandardTracer* self, PyObject* value, void* context )
 {
-    if( reinterpret_cast<PyObject*>( self ) == value )
-        return 0;
-    cppy::ptr old( self->owner );
-    self->owner = cppy::incref( value );
+    if ( !is_atom_instance(value) )
+        return cppy::type_error("owner must be an Atom instance");
+    cppy::replace(&self->owner, value );
     return 0;
 }
 
@@ -619,12 +584,9 @@ StandardTracer_get_name( StandardTracer* self, void* context )
 PyObject*
 StandardTracer_set_name( StandardTracer* self, PyObject* value, void* context )
 {
-    if( reinterpret_cast<PyObject*>( self ) == value )
-        return 0;
     if ( !PyUnicode_Check(value) )
         return cppy::type_error("name must be a str");
-    cppy::ptr old( self->name );
-    self->name = cppy::incref( value );
+    cppy::replace(&self->name, value );
     return 0;
 }
 
@@ -639,12 +601,9 @@ StandardTracer_get_key( StandardTracer* self, void* context )
 PyObject*
 StandardTracer_set_key( StandardTracer* self, PyObject* value, void* context )
 {
-    if( reinterpret_cast<PyObject*>( self ) == value )
-        return 0;
     if ( !PyUnicode_Check(value) )
         return cppy::type_error("key must be a str");
-    cppy::ptr old( self->key );
-    self->key = cppy::incref( value );
+    cppy::replace(&self->key, value );
     return 0;
 }
 
@@ -658,12 +617,9 @@ StandardTracer_get_items( StandardTracer* self, void* context )
 PyObject*
 StandardTracer_set_items( StandardTracer* self, PyObject* value, void* context )
 {
-    if( reinterpret_cast<PyObject*>( self ) == value )
-        return 0;
     if ( !PySet_Check(value) )
         return cppy::type_error("items must be a set");
-    cppy::ptr old( self->items );
-    self->items = cppy::incref( value );
+    cppy::replace(&self->items, value );
     return 0;
 }
 
@@ -695,7 +651,7 @@ StandardTracer_getset[] = {
 
 static PyMethodDef
 StandardTracer_methods[] = {
-    { "trace_atom", ( PyCFunction )StandardTracer_trace_atom, METH_VARARGS,
+    { "trace_atom", ( PyCFunction )StandardTracer_trace_atom, METH_FASTCALL,
       "Get whether notification is enabled for the atom.\n"
       "\n"
       "Parameters\n"
@@ -712,25 +668,25 @@ StandardTracer_methods[] = {
         "This method will discard the old observer and attach a new\n"
         "observer to the traced dependencies."
     },
-    { "dynamic_load", ( PyCFunction )StandardTracer_dyanmic_load, METH_VARARGS,
+    { "dynamic_load", ( PyCFunction )StandardTracer_dyanmic_load, METH_FASTCALL,
         "Called when an object attribute is dynamically loaded.\n"
         "\n"
         "This will trace the object if it is an Atom instance.\n"
         "See also: `CodeTracer.dynamic_load`."
     },
-    { "load_attr", ( PyCFunction )StandardTracer_load_attr, METH_VARARGS,
+    { "load_attr", ( PyCFunction )StandardTracer_load_attr, METH_FASTCALL,
         "Called before the LOAD_ATTR opcode is executed.\n"
         "\n"
         "This will trace the object if it is an Atom instance.\n"
         "See also: `CodeTracer.load_attr`."
     },
-    { "call_function", ( PyCFunction )StandardTracer_call_function, METH_VARARGS,
+    { "call_function", ( PyCFunction )StandardTracer_call_function, METH_FASTCALL,
         "Called before the CALL opcode is executed.\n"
         "\n"
         "This will trace the func if it is the builtin `getattr` and the\n"
         "object is an Atom instance. See also: `CodeTracer.call_function`"
     },
-    { "binary_subscr", ( PyCFunction )StandardTracer_binary_subscr, METH_VARARGS,
+    { "binary_subscr", ( PyCFunction )StandardTracer_binary_subscr, METH_FASTCALL,
         "Called before the BINARY_SUBSCR opcode is executed.\n"
     },
     { "get_iter", ( PyCFunction )StandardTracer_get_iter, METH_O,
@@ -811,14 +767,14 @@ standard_tracer_modexec( PyObject *mod )
         PyErr_SetString( PyExc_ImportError, "Could not import atom.api" );
         return -1;
     }
-    atomref.set( atom_api.getattr("atomref") );
+    atomref = atom_api.getattr("atomref");
     if ( !atomref )
     {
         PyErr_SetString( PyExc_ImportError, "Could not import atom.api.atomref" );
         return 0;
     }
 
-    Atom.set( atom_api.getattr("Atom") );
+    Atom = atom_api.getattr("Atom");
     if ( !Atom )
     {
         PyErr_SetString( PyExc_ImportError, "Could not import atom.api.Atom" );
@@ -832,7 +788,7 @@ standard_tracer_modexec( PyObject *mod )
         return -1;
     }
 
-    getattr.set( builtins.getattr("getattr") );
+    getattr = builtins.getattr("getattr");
     if ( !getattr )
     {
         PyErr_SetString( PyExc_ImportError, "Could not import builtins.getattr" );
@@ -845,7 +801,7 @@ standard_tracer_modexec( PyObject *mod )
         PyErr_SetString( PyExc_ImportError, "Could not import enaml.core.Alias" );
         return -1;
     }
-    Alias.set( enaml_core_alias.getattr("Alias") );
+    Alias = enaml_core_alias.getattr("Alias");
     if ( !Alias )
     {
         PyErr_SetString( PyExc_ImportError, "Could not import enaml.core.alias.Alias" );
