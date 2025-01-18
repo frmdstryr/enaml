@@ -349,13 +349,7 @@ PyObject*
 _StandardTracer_trace_atom_internal( StandardTracer* self, PyObject* obj, PyObject* name )
 {
 
-    PyObject* get_member_args[] = { obj, name };
-    cppy::ptr member( PyObject_VectorcallMethod(
-        get_member_str,
-        get_member_args,
-        2 | PY_VECTORCALL_ARGUMENTS_OFFSET,
-        0
-    ) );
+    cppy::ptr member( PyObject_CallMethodOneArg( obj, get_member_str, name) );
     if ( !member )
         return 0;
     if ( !member.is_none() )
@@ -376,13 +370,7 @@ _StandardTracer_trace_atom_internal( StandardTracer* self, PyObject* obj, PyObje
         if ( !aliasptr && PyErr_Occurred() )
             PyErr_Clear(); // getattr(type(obj), name) is None
         else if ( is_alias( aliasptr.get() ) ) {
-            PyObject* resolve_args[] = { aliasptr.get(), obj };
-            cppy::ptr alias_result( PyObject_VectorcallMethod(
-                resolve_str,
-                resolve_args,
-                2 | PY_VECTORCALL_ARGUMENTS_OFFSET,
-                0
-            ) );
+            cppy::ptr alias_result( PyObject_CallMethodOneArg( aliasptr.get(), resolve_str, obj ) );
             if ( !alias_result )
                 return 0;
             if ( !PyTuple_Check(alias_result.get()) || PyTuple_GET_SIZE(alias_result.get()) != 2 )
