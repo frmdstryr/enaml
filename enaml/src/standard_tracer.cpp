@@ -25,6 +25,13 @@ static PyObject* atomref;
 static PyObject* getattr;
 static PyObject* Atom;
 static PyObject* Alias;
+static PyObject* get_member_str;
+static PyObject* d_engine_str;
+static PyObject* d_storage_str;
+static PyObject* update_str;
+static PyObject* resolve_str;
+static PyObject* ref_str;
+static PyObject* observe_str;
 
 // POD struct - all member fields are considered private
 struct StandardTracer
@@ -134,20 +141,13 @@ SubscriptionObserver_call( SubscriptionObserver* self, PyObject* args, PyObject*
         cppy::ptr owner( PyObject_CallNoArgs( self->ref ) );
         if ( !owner )
             return 0;
-        cppy::ptr engine( owner.getattr("_d_engine") );
+        cppy::ptr engine( owner.getattr(d_engine_str) );
         if ( !engine )
             return 0;
         if ( !engine.is_none() )
         {
-            cppy::ptr update_args( PyTuple_New( 2 ) );
-            if( !update_args )
-                return 0;
-            PyTuple_SET_ITEM( update_args.get(), 0, cppy::incref( owner.get() ) );
-            PyTuple_SET_ITEM( update_args.get(), 1, cppy::incref( self->name ) );
-            cppy::ptr update( engine.getattr( "update" ) );
-            if( !update )
-                return 0;
-            return update.call( update_args );
+            PyObject* call_args[] = { engine.get(), owner.get(), self->name };
+            return PyObject_VectorcallMethod(update_str, call_args, 3 | PY_VECTORCALL_ARGUMENTS_OFFSET, 0);
         }
     }
     Py_RETURN_NONE;
@@ -348,10 +348,14 @@ static bool is_getattr( PyObject* obj )
 PyObject*
 _StandardTracer_trace_atom_internal( StandardTracer* self, PyObject* obj, PyObject* name )
 {
-    cppy::ptr get_member( PyObject_GetAttrString( obj, "get_member") );
-    if ( !get_member )
-        return 0;
-    cppy::ptr member( PyObject_CallOneArg( get_member.get(), name ) );
+
+    PyObject* get_member_args[] = { obj, name };
+    cppy::ptr member( PyObject_VectorcallMethod(
+        get_member_str,
+        get_member_args,
+        2 | PY_VECTORCALL_ARGUMENTS_OFFSET,
+        0
+    ) );
     if ( !member )
         return 0;
     if ( !member.is_none() )
@@ -372,10 +376,13 @@ _StandardTracer_trace_atom_internal( StandardTracer* self, PyObject* obj, PyObje
         if ( !aliasptr && PyErr_Occurred() )
             PyErr_Clear(); // getattr(type(obj), name) is None
         else if ( is_alias( aliasptr.get() ) ) {
-            cppy::ptr resolve = aliasptr.getattr("resolve");
-            if ( !resolve )
-                return 0;
-            cppy::ptr alias_result( PyObject_CallOneArg( resolve.get(), obj ) );
+            PyObject* resolve_args[] = { aliasptr.get(), obj };
+            cppy::ptr alias_result( PyObject_VectorcallMethod(
+                resolve_str,
+                resolve_args,
+                2 | PY_VECTORCALL_ARGUMENTS_OFFSET,
+                0
+            ) );
             if ( !alias_result )
                 return 0;
             if ( !PyTuple_Check(alias_result.get()) || PyTuple_GET_SIZE(alias_result.get()) != 2 )
@@ -420,7 +427,7 @@ StandardTracer_trace_atom( StandardTracer* self, PyObject *const *args, Py_ssize
 PyObject*
 StandardTracer_finalize( StandardTracer* self )
 {
-    cppy::ptr storage( PyObject_GetAttrString( self->owner, "_d_storage") );
+    cppy::ptr storage( PyObject_GetAttr( self->owner, d_storage_str ) );
     if ( !storage )
         return 0;
 
@@ -429,17 +436,12 @@ StandardTracer_finalize( StandardTracer* self )
     if ( !old_observer && PyErr_Occurred() )
         PyErr_Clear();
     else
-        old_observer.setattr("ref", Py_None);
+        old_observer.setattr(ref_str, Py_None);
 
     if ( PyObject_IsTrue( self->items ) )
     {
-        cppy::ptr observer_args( PyTuple_New (2) );
-        if( !observer_args )
-            return 0;
-        PyTuple_SET_ITEM( observer_args.get(), 0, cppy::incref( self->owner ) );
-        PyTuple_SET_ITEM( observer_args.get(), 1, cppy::incref( self->name ) );
-
-        cppy::ptr observer( PyObject_Call( pyobject_cast(SubscriptionObserver::TypeObject), observer_args.get(), 0 ) );
+        PyObject* observer_args[] = { self->owner, self->name };
+        cppy::ptr observer( PyObject_Vectorcall( pyobject_cast(SubscriptionObserver::TypeObject), observer_args, 2, 0 ) );
         if ( !observer )
             return 0;
 
@@ -457,16 +459,8 @@ StandardTracer_finalize( StandardTracer* self )
                 return cppy::type_error("StandardTracer items should be a tuple of (obj, d_name)");
             PyObject* obj = PyTuple_GET_ITEM(item.get(), 0);
             PyObject* d_name = PyTuple_GET_ITEM(item.get(), 1);
-            cppy::ptr observe( PyObject_GetAttrString( obj, "observe" ) );
-            if( !observe )
-                return 0;
-            cppy::ptr args( PyTuple_New (2) );
-            if( !args )
-                return 0;
-            PyTuple_SET_ITEM( args.get(), 0, cppy::incref( d_name ) );
-            PyTuple_SET_ITEM( args.get(), 1, cppy::incref( observer.get() ) );
-
-            cppy::ptr result( observe.call( args ) );
+            PyObject* observe_args[] = { obj, d_name, observer.get() };
+            cppy::ptr result( PyObject_VectorcallMethod(observe_str, observe_args, 3 | PY_VECTORCALL_ARGUMENTS_OFFSET, 0 ) );
             if ( !result )
                 return 0;
         }
@@ -542,28 +536,9 @@ StandardTracer_get_owner( StandardTracer* self, void* context )
 }
 
 PyObject*
-StandardTracer_set_owner( StandardTracer* self, PyObject* value, void* context )
-{
-    if ( !is_atom_instance(value) )
-        return cppy::type_error("owner must be an Atom instance");
-    cppy::replace(&self->owner, value );
-    return 0;
-}
-
-
-PyObject*
 StandardTracer_get_name( StandardTracer* self, void* context )
 {
     return cppy::incref( self->name );
-}
-
-PyObject*
-StandardTracer_set_name( StandardTracer* self, PyObject* value, void* context )
-{
-    if ( !PyUnicode_Check(value) )
-        return cppy::type_error("name must be a str");
-    cppy::replace(&self->name, value );
-    return 0;
 }
 
 
@@ -575,29 +550,11 @@ StandardTracer_get_key( StandardTracer* self, void* context )
 
 
 PyObject*
-StandardTracer_set_key( StandardTracer* self, PyObject* value, void* context )
-{
-    if ( !PyUnicode_Check(value) )
-        return cppy::type_error("key must be a str");
-    cppy::replace(&self->key, value );
-    return 0;
-}
-
-PyObject*
 StandardTracer_get_items( StandardTracer* self, void* context )
 {
     return cppy::incref( self->items );
 }
 
-
-PyObject*
-StandardTracer_set_items( StandardTracer* self, PyObject* value, void* context )
-{
-    if ( !PySet_Check(value) )
-        return cppy::type_error("items must be a set");
-    cppy::replace(&self->items, value );
-    return 0;
-}
 
 PyDoc_STRVAR(StandardTracer__doc__,
              "StandardTracer(owner, name)\n\n"
@@ -613,13 +570,13 @@ PyDoc_STRVAR(StandardTracer__doc__,
 
 static PyGetSetDef
 StandardTracer_getset[] = {
-    { "owner", ( getter )StandardTracer_get_owner, ( setter )StandardTracer_set_owner,
+    { "owner", ( getter )StandardTracer_get_owner, 0,
         "Get and set the owner for the tracer." },
-    { "name", ( getter )StandardTracer_get_name, ( setter )StandardTracer_set_name,
+    { "name", ( getter )StandardTracer_get_name, 0,
         "Get and set the name for the tracer." },
-    { "key", ( getter )StandardTracer_get_key, ( setter )StandardTracer_set_key,
+    { "key", ( getter )StandardTracer_get_key, 0,
         "Get and set the key for the tracer." },
-    { "items", ( getter )StandardTracer_get_items, ( setter )StandardTracer_set_items,
+    { "items", ( getter )StandardTracer_get_items, 0,
         "Get and set the items for the tracer." },
     { 0 } // sentinel
 };
@@ -735,6 +692,34 @@ standard_tracer_modexec( PyObject *mod )
     if( !StandardTracer::Ready() || !SubscriptionObserver::Ready() )
         return -1;
 
+
+    d_engine_str = PyUnicode_FromString("_d_engine");
+    if ( !d_engine_str )
+        return -1;
+
+    d_storage_str = PyUnicode_FromString("_d_storage");
+    if ( !d_storage_str )
+        return -1;
+
+    update_str = PyUnicode_FromString("update");
+    if ( !update_str )
+        return -1;
+
+    observe_str = PyUnicode_FromString("observe");
+    if ( !observe_str )
+        return -1;
+
+    resolve_str = PyUnicode_FromString("resolve");
+    if ( !resolve_str )
+        return -1;
+
+    ref_str = PyUnicode_FromString("ref");
+    if ( !ref_str )
+        return -1;
+
+    get_member_str = PyUnicode_FromString("get_member");
+    if ( !get_member_str )
+        return -1;
 
     cppy::ptr atom_api( PyImport_ImportModule("atom.api") );
     if ( !atom_api )
