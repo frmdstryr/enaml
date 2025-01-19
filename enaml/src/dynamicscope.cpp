@@ -142,16 +142,8 @@ maybe_translate_key_error()
 inline bool
 run_tracer( PyObject* tracer, PyObject* owner, PyObject* name, PyObject* value )
 {
-    cppy::ptr handler( PyObject_GetAttr( tracer, dynamic_load_str ) );
-    if( !handler )
-        return false;
-    cppy::ptr args( PyTuple_New( 3 ) );
-    if( !args )
-        return false;
-    PyTuple_SET_ITEM( args.get(), 0, cppy::incref( owner ) );
-    PyTuple_SET_ITEM( args.get(), 1, cppy::incref( name ) );
-    PyTuple_SET_ITEM( args.get(), 2, cppy::incref( value ) );
-    cppy::ptr res( handler.call( args ) );
+    PyObject* args[] = { tracer, owner, name, value };
+    cppy::ptr res( PyObject_VectorcallMethod( dynamic_load_str, args, 4 | PY_VECTORCALL_ARGUMENTS_OFFSET, 0 ) );
     if( !res )
         return false;
     return true;
