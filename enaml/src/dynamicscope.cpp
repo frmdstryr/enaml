@@ -664,15 +664,12 @@ DynamicScope_getitem( DynamicScope* self, PyObject* key )
 }
 
 PyObject*
-DynamicScope_get( DynamicScope* self, PyObject* args)
+DynamicScope_get( DynamicScope* self, PyObject*const *args, Py_ssize_t nargs)
 {
-    PyObject *key;
-    PyObject *default_value = NULL;
+    if ( !(nargs == 1 || nargs == 2) )
+        return cppy::type_error("get requires 1 or 2 arguments");
 
-    if ( !PyArg_ParseTuple(args, "O|O", &key, &default_value) )
-    {
-        return 0;
-    }
+    PyObject *key = args[0];
 
     PyObject* res = DynamicScope_getitem(self, key);
     if ( res )
@@ -689,11 +686,11 @@ DynamicScope_get( DynamicScope* self, PyObject* args)
         PyErr_Clear();
     }
 
-    if ( !default_value )
+    if ( nargs == 1 )
     {
         Py_RETURN_NONE;
     }
-    return cppy::incref( default_value );
+    return cppy::incref( args[1] );
 }
 
 int
@@ -778,7 +775,7 @@ DynamicScope_contains( DynamicScope* self, PyObject* key )
 
 
 static PyMethodDef DynamicScope_methods[] = {
-    {"get",    reinterpret_cast<PyCFunction>(DynamicScope_get), METH_VARARGS, ""},
+    {"get",    reinterpret_cast<PyCFunction>(DynamicScope_get), METH_FASTCALL, ""},
     { 0 }  // Sentinel
 };
 
