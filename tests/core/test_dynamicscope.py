@@ -177,6 +177,8 @@ def test_dynamicscope_getitem(dynamicscope):
                            nlocals, dynamicscope, args[-1]]):
         assert dynamicscope[key] == value
 
+    assert dynamicscope["{}{}".format("se", "lf")] == dynamicscope["self"]
+
     with pytest.raises(KeyError):
         dynamicscope['z']
 

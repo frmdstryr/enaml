@@ -64,6 +64,11 @@ namespace
 
 static PyObject* parent_str;
 static PyObject* dynamic_load_str;
+static Py_hash_t self_hash;
+static Py_hash_t change_hash;
+static Py_hash_t nonlocals_hash;
+static Py_hash_t scope_hash;
+static Py_hash_t tracer_hash;
 static PyObject* UserKeyError;
 
 
@@ -142,16 +147,8 @@ maybe_translate_key_error()
 inline bool
 run_tracer( PyObject* tracer, PyObject* owner, PyObject* name, PyObject* value )
 {
-    cppy::ptr handler( PyObject_GetAttr( tracer, dynamic_load_str ) );
-    if( !handler )
-        return false;
-    cppy::ptr args( PyTuple_New( 3 ) );
-    if( !args )
-        return false;
-    PyTuple_SET_ITEM( args.get(), 0, cppy::incref( owner ) );
-    PyTuple_SET_ITEM( args.get(), 1, cppy::incref( name ) );
-    PyTuple_SET_ITEM( args.get(), 2, cppy::incref( value ) );
-    cppy::ptr res( handler.call( args ) );
+    PyObject* args[] = {tracer, owner, name, value};
+    cppy::ptr res( PyObject_VectorcallMethod( dynamic_load_str, args, 4 | PY_VECTORCALL_ARGUMENTS_OFFSET, 0) );
     if( !res )
         return false;
     return true;
@@ -325,10 +322,7 @@ Nonlocals_traverse( Nonlocals* self, visitproc visit, void* arg )
 {
     Py_VISIT( self->owner );
     Py_VISIT( self->tracer );
-#if PY_VERSION_HEX >= 0x03090000
-    // This was not needed before Python 3.9 (Python issue 35810 and 40217)
     Py_VISIT(Py_TYPE(self));
-#endif
     return 0;
 }
 
@@ -336,9 +330,11 @@ Nonlocals_traverse( Nonlocals* self, visitproc visit, void* arg )
 void
 Nonlocals_dealloc( Nonlocals* self )
 {
+    PyTypeObject *tp = Py_TYPE(self);
     PyObject_GC_UnTrack( self );
     Nonlocals_clear( self );
-    Py_TYPE(self)->tp_free( pyobject_cast( self ) );
+    tp->tp_free( pyobject_cast( self ) );
+    Py_DECREF(tp);
 }
 
 
@@ -382,12 +378,11 @@ Nonlocals_call( Nonlocals* self, PyObject* args, PyObject* kwargs )
         return 0;
     }
     PyObject* res = PyType_GenericNew( Py_TYPE(self), 0, 0 );
-    if( res )
-    {
-        Nonlocals* nl = reinterpret_cast<Nonlocals*>( res );
-        nl->owner = cppy::incref( objptr.get() );
-        nl->tracer = cppy::xincref( self->tracer );
-    }
+    if( !res )
+        return 0;
+    Nonlocals* nl = reinterpret_cast<Nonlocals*>( res );
+    nl->owner = cppy::incref( objptr.get() );
+    nl->tracer = cppy::xincref( self->tracer );
     return res;
 }
 
@@ -576,10 +571,7 @@ DynamicScope_traverse( DynamicScope* self, visitproc visit, void* arg )
     Py_VISIT( self->f_builtins );
     Py_VISIT( self->f_writes );
     Py_VISIT( self->f_nonlocals );
-#if PY_VERSION_HEX >= 0x03090000
-    // This was not needed before Python 3.9 (Python issue 35810 and 40217)
     Py_VISIT(Py_TYPE(self));
-#endif
     return 0;
 }
 
@@ -587,11 +579,12 @@ DynamicScope_traverse( DynamicScope* self, visitproc visit, void* arg )
 void
 DynamicScope_dealloc( DynamicScope* self )
 {
+    PyTypeObject *tp = Py_TYPE(self);
     PyObject_GC_UnTrack( self );
     DynamicScope_clear( self );
-    Py_TYPE(self)->tp_free( pyobject_cast( self ) );
+    tp->tp_free( pyobject_cast( self ) );
+    Py_DECREF(tp);
 }
-
 
 PyObject*
 DynamicScope_getitem( DynamicScope* self, PyObject* key )
@@ -609,16 +602,20 @@ DynamicScope_getitem( DynamicScope* self, PyObject* key )
             return cppy::incref( res );
     }
 
+    Py_hash_t key_hash = PyObject_Hash( key );
+    if ( key_hash == -1 )
+        return 0;
+
     // 'self' magic
-    if( strcmp( (char *)PyUnicode_AsUTF8( key ), "self" ) == 0 )
+    if( key_hash == self_hash )
         return cppy::incref( self->owner );
 
     // 'change' magic
-    if( self->change && strcmp( (char *)PyUnicode_AsUTF8( key ), "change" ) == 0 )
+    if( key_hash == change_hash && self->change )
         return cppy::incref( self->change );
 
     // 'nonlocals' magic
-    if( strcmp( (char *)PyUnicode_AsUTF8( key ), "nonlocals" ) == 0 )
+    if( key_hash == nonlocals_hash )
     {
         if( !self->f_nonlocals )
         {
@@ -633,11 +630,11 @@ DynamicScope_getitem( DynamicScope* self, PyObject* key )
     }
 
     // __scope__ magic
-    if( strcmp( (char *)PyUnicode_AsUTF8( key ), "__scope__" ) == 0 )
+    if( key_hash == scope_hash )
         return cppy::incref( pyobject_cast( self ) );
 
     // _[tracer] magic
-    if( self->tracer && strcmp( (char *)PyUnicode_AsUTF8( key ), "_[tracer]" ) == 0 )
+    if( key_hash == tracer_hash && self->tracer )
         return cppy::incref( pyobject_cast( self->tracer ) );
 
     // value from the local scope
@@ -672,16 +669,11 @@ DynamicScope_getitem( DynamicScope* self, PyObject* key )
 }
 
 PyObject*
-DynamicScope_get( DynamicScope* self, PyObject* args)
+DynamicScope_get( DynamicScope* self, PyObject*const *args, Py_ssize_t n )
 {
-    PyObject *key;
-    PyObject *default_value = NULL;
-
-    if ( !PyArg_ParseTuple(args, "O|O", &key, &default_value) )
-    {
-        return 0;
-    }
-
+    if( n < 1 || n > 2 )
+        return cppy::type_error( "signature is get(key, default=None)" );
+    PyObject* key = args[0];
     PyObject* res = DynamicScope_getitem(self, key);
     if ( res )
     {
@@ -697,11 +689,7 @@ DynamicScope_get( DynamicScope* self, PyObject* args)
         PyErr_Clear();
     }
 
-    if ( !default_value )
-    {
-        Py_RETURN_NONE;
-    }
-    return cppy::incref( default_value );
+    return cppy::incref( n == 2 ? args[1] : Py_None );
 }
 
 int
@@ -742,24 +730,28 @@ DynamicScope_contains( DynamicScope* self, PyObject* key )
     if( self->f_writes && PyDict_GetItem( self->f_writes, key ) )
         return 1;
 
+    Py_hash_t key_hash = PyObject_Hash( key );
+    if ( key_hash == -1 )
+        return -1;
+
     // 'self' magic
-    if( strcmp( (char *)PyUnicode_AsUTF8( key ), "self" ) == 0 )
+    if( key_hash == self_hash )
         return 1;
 
     // 'change' magic
-    if( self->change && strcmp( (char *)PyUnicode_AsUTF8( key ), "change" ) == 0 )
+    if( key_hash == change_hash && self->change )
         return 1;
 
     // 'nonlocals' magic
-    if( strcmp( (char *)PyUnicode_AsUTF8( key ), "nonlocals" ) == 0 )
+    if( key_hash == nonlocals_hash )
         return 1;
 
     // __scope__ magic
-    if( strcmp( (char *)PyUnicode_AsUTF8( key ), "__scope__" ) == 0 )
+    if( key_hash == scope_hash )
         return 1;
 
     // _[tracer] magic
-    if( self->tracer && strcmp( (char *)PyUnicode_AsUTF8( key ), "_[tracer]" ) == 0 )
+    if( key_hash == tracer_hash && self->tracer )
         return 1;
 
     // value from the local scope
@@ -833,7 +825,7 @@ DynamicScope_getset[] = {
 
 
 static PyMethodDef DynamicScope_methods[] = {
-    {"get",    reinterpret_cast<PyCFunction>(DynamicScope_get), METH_VARARGS, ""},
+    {"get",    reinterpret_cast<PyCFunction>(DynamicScope_get), METH_FASTCALL, ""},
     { 0 }  // Sentinel
 };
 
@@ -887,20 +879,48 @@ bool DynamicScope::Ready()
 namespace
 {
 
+static Py_hash_t hash_str(const char* s)
+{
+    cppy::ptr str(PyUnicode_InternFromString( s ));
+    if (!str)
+        return -1;
+    return PyObject_Hash(str.get());
+}
 
 int
 dynamicscope_modexec( PyObject *mod )
 {
-    parent_str = PyUnicode_FromString( "_parent" );
+    parent_str = PyUnicode_InternFromString( "_parent" );
     if( !parent_str )
     {
         return -1;  // LCOV_EXCL_LINE (failed to create string)
     }
-    dynamic_load_str = PyUnicode_FromString( "dynamic_load" );
+    dynamic_load_str = PyUnicode_InternFromString( "dynamic_load" );
     if( !dynamic_load_str )
     {
         return -1;  // LCOV_EXCL_LINE (failed to create string)
     }
+
+    self_hash = hash_str( "self" );
+    if( self_hash == -1 )
+        return -1;  // LCOV_EXCL_LINE (failed to create string)
+
+    change_hash = hash_str( "change" );
+    if( change_hash == -1 )
+        return -1;  // LCOV_EXCL_LINE (failed to create string)
+
+    nonlocals_hash = hash_str( "nonlocals" );
+    if( nonlocals_hash == -1 )
+        return -1;  // LCOV_EXCL_LINE (failed to create string)
+
+    scope_hash = hash_str( "__scope__" );
+    if( scope_hash == -1 )
+        return -1;  // LCOV_EXCL_LINE (failed to create string)
+
+    tracer_hash = hash_str( "_[tracer]" );
+    if( tracer_hash == -1 )
+        return -1;  // LCOV_EXCL_LINE (failed to create string)
+
     UserKeyError = PyErr_NewException( "dynamicscope.UserKeyError", 0, 0 );
     if( !UserKeyError )
     {
@@ -924,7 +944,8 @@ dynamicscope_modexec( PyObject *mod )
 	}
     dynamicscope.release();
 
-    PyModule_AddObject( mod, "UserKeyError", UserKeyError );
+    if( PyModule_AddObjectRef( mod, "UserKeyError", UserKeyError ) < 0 )
+        return -1; // LCOV_EXCL_LINE (failed to add to module)
 
     return 0;
 }
