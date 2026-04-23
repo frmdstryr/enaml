@@ -23,7 +23,6 @@ from .operators import __get_operators
 from .template import Template
 from .funchelper import call_func
 
-
 def resolve_alias(node, alias):
     """ Resolve the compiler item pointed to by an alias.
 
@@ -743,7 +742,7 @@ def wrap_function(func, scope):
 
     """
     def wrapper(*args, **kwargs):
-        return call_func(func, args, kwargs, scope)
+        return call_func(func, scope, args, kwargs)
 
     update_wrapper(wrapper, func)
 

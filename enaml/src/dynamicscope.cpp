@@ -64,6 +64,9 @@ namespace
 
 static PyObject* parent_str;
 static PyObject* dynamic_load_str;
+static PyObject* d_storage_str;
+static PyObject* get_str;
+static PyObject* super_disallowed;
 static PyObject* UserKeyError;
 
 
@@ -301,6 +304,14 @@ set_dynamic_attr( PyObject* obj, PyObject* name, PyObject* value )
 }
 
 
+PyObject*
+_SuperDisallowed( PyObject* mod, PyObject* args, PyObject* kwargs)
+{
+    return cppy::type_error( "super() is not allowed in a declarative function, "
+    " use SomeClass.some_method(self, ...) instead." );
+}
+
+
 /*-----------------------------------------------------------------------------
 | Nonlocals
 |----------------------------------------------------------------------------*/
@@ -508,31 +519,41 @@ PyObject*
 DynamicScope_new( PyTypeObject* type, PyObject* args, PyObject* kwargs )
 {
     PyObject* owner;
-    PyObject* f_locals;
-    PyObject* f_globals;
-    PyObject* f_builtins;
+    PyObject* func;
+    PyObject* scope_key;
     PyObject* change = 0;
     PyObject* tracer = 0;
-    static char* kwlist[] = {
-        "owner", "f_locals", "f_globals", "f_builtins", "change", "tracer", 0
-    };
-    if( !PyArg_ParseTupleAndKeywords( args, kwargs, "OOOO|OO:__new__", kwlist,
-        &owner, &f_locals, &f_globals, &f_builtins, &change, &tracer ) )
+    if( !PyArg_ParseTuple( args, "OOO|OO:__new__", &owner, &func, &scope_key, &change, &tracer ) )
         return 0;
-    if( !PyMapping_Check( f_locals ) )
-        return cppy::type_error( f_locals, "mapping" );
+    if( !PyFunction_Check( func ) )
+        return cppy::type_error( func, "function" );
+
+    PyFunctionObject* f = reinterpret_cast<PyFunctionObject*>(func);
+    PyObject* f_globals = f->func_globals;
+    PyObject* f_builtins = f->func_builtins;
+
     if( !PyDict_CheckExact( f_globals ) )
         return cppy::type_error( f_globals, "dict" );
-    if( !PyDict_CheckExact( f_builtins ) )
+    if( f_builtins && !PyDict_CheckExact( f_builtins ) )
         return cppy::type_error( f_builtins, "dict" );
+
+    cppy::ptr d_storage( PyObject_GetAttr( owner, d_storage_str ) );
+    if ( !d_storage )
+        return 0;
+    cppy::ptr empty( PyDict_New() );
+    PyObject* d_storage_get_args[] = { d_storage.get(), scope_key, empty.get() };
+    cppy::ptr f_locals( PyObject_VectorcallMethod( get_str, d_storage_get_args, 2 | PY_VECTORCALL_ARGUMENTS_OFFSET, 0 ) );
+    if ( !f_locals )
+        return 0;
+
     PyObject* self = PyType_GenericNew( type, 0, 0 );
     if( !self )
         return 0;
     DynamicScope* scope = reinterpret_cast<DynamicScope*>( self );
     scope->owner = cppy::incref( owner );
-    scope->f_locals = cppy::incref( f_locals );
+    scope->f_locals = f_locals.release();
     scope->f_globals = cppy::incref( f_globals );
-    scope->f_builtins = cppy::incref( f_builtins );
+    scope->f_builtins = cppy::xincref( f_builtins );
     if( change && change != Py_None )
         scope->change = cppy::incref( change );
     if( tracer && tracer != Py_None )
@@ -540,6 +561,40 @@ DynamicScope_new( PyTypeObject* type, PyObject* args, PyObject* kwargs )
     return self;
 }
 
+// PyObject*
+// DynamicScope_vectorcall(
+//     PyObject *type, PyObject *const *args, size_t nargsf, PyObject *kwnames
+// )
+// {
+//     const auto n = PyVectorcall_NARGS(nargsf);
+//     if ( n < 3 || n > 6 || kwnames)
+//         return cppy::type_error("signature is DynamicScope(owner, f_locals, f_globals, [f_builtins, change, tracer])");
+//     PyObject* owner = args[0];
+//     PyObject* f_locals = args[1];
+//     PyObject* f_globals = args[2];
+//     PyObject* f_builtins = n > 3 ? args[3] : 0;
+//     PyObject* change = n > 4 ? args[4] : Py_None;
+//     PyObject* tracer = n > 5 ? args[5] : Py_None;
+//     if( !PyMapping_Check( f_locals ) )
+//         return cppy::type_error( f_locals, "mapping" );
+//     if( !PyDict_CheckExact( f_globals ) )
+//         return cppy::type_error( f_globals, "dict" );
+//     if( f_builtins && !PyDict_CheckExact( f_builtins ) )
+//         return cppy::type_error( f_builtins, "dict" );
+//     PyObject* self = PyType_GenericNew( pytype_cast(type), 0, 0 );
+//     if( !self )
+//         return 0;
+//     DynamicScope* scope = reinterpret_cast<DynamicScope*>( self );
+//     scope->owner = cppy::incref( owner );
+//     scope->f_locals = cppy::incref( f_locals );
+//     scope->f_globals = cppy::incref( f_globals );
+//     scope->f_builtins = cppy::xincref( f_builtins );
+//     if( change != Py_None )
+//         scope->change = cppy::incref( change );
+//     if( tracer != Py_None )
+//         scope->tracer = cppy::incref( tracer );
+//     return self;
+// }
 
 void
 DynamicScope_clear( DynamicScope* self )
@@ -644,15 +699,22 @@ DynamicScope_getitem( DynamicScope* self, PyObject* key )
         PyErr_Clear();
     }
 
+    // super magic
+    if( strcmp( key_data, "super" ) == 0 )
+        return cppy::incref(super_disallowed);
+
     // value from the global scope
     res = PyDict_GetItem( self->f_globals, key );
     if( res )
         return cppy::incref( res );
 
     // value from the builtin scope
-    res = PyDict_GetItem( self->f_builtins, key );
-    if( res )
-        return cppy::incref( res );
+    if ( self-> f_builtins )
+    {
+        res = PyDict_GetItem( self->f_builtins, key );
+        if( res )
+            return cppy::incref( res );
+    }
 
     res = load_dynamic_attr( self->owner, key, self->tracer );
     if( res )
@@ -687,6 +749,7 @@ DynamicScope_get( DynamicScope* self, PyObject*const *args, Py_ssize_t n )
 
     return cppy::incref( n == 2 ? args[1] : Py_None );
 }
+
 
 int
 DynamicScope_setitem( DynamicScope* self, PyObject* key, PyObject* value )
@@ -745,6 +808,10 @@ DynamicScope_contains( DynamicScope* self, PyObject* key )
     if( strcmp( key_data, "__scope__" ) == 0 )
         return 1;
 
+    // super magic
+    if( strcmp( key_data, "super" ) == 0 )
+        return 1;
+
     // _[tracer] magic
     if( self->tracer && strcmp( key_data, "_[tracer]" ) == 0 )
         return 1;
@@ -765,10 +832,88 @@ DynamicScope_contains( DynamicScope* self, PyObject* key )
         return 1;
 
     // value from the builtin scope
-    if( PyDict_GetItem( self->f_builtins, key ) )
+    if( self->f_builtins && PyDict_GetItem( self->f_builtins, key ) )
         return 1;
 
     return test_dynamic_attr( self->owner, key );
+}
+
+PyObject* DynamicScope_eval( DynamicScope* self, PyObject*const *args, Py_ssize_t nargsf)
+{
+    const auto n = PyVectorcall_NARGS(nargsf);
+    if( n < 1 || n > 3 )
+    {
+        PyErr_SetString( PyExc_TypeError, "signature is eval(func, args[, kwargs])" );
+        return 0;
+    }
+    PyObject* func = args[0];
+    PyObject* func_args = n > 1 ? args[1] : 0;
+    PyObject* func_kwargs = n > 2 ? args[2] : 0;
+    if( !PyFunction_Check( func ) )
+    {
+        PyErr_SetString( PyExc_TypeError, "function must be a Python function" );
+        return 0;
+    }
+
+    if( func_args && !PyTuple_Check( func_args ) )
+    {
+        PyErr_SetString( PyExc_TypeError, "arguments must be a tuple" );
+        return 0;
+    }
+
+    if( func_kwargs && !PyDict_Check( func_kwargs ) )
+    {
+        PyErr_SetString( PyExc_TypeError, "keywords must be a dict" );
+        return 0;
+    }
+
+    PyObject** arguments = 0;
+    Py_ssize_t num_args = 0;
+    if (func_args)
+    {
+        arguments = &PyTuple_GET_ITEM( func_args, 0 );
+        num_args = PyTuple_GET_SIZE( func_args );
+    }
+
+    PyObject** defaults = 0;
+    Py_ssize_t num_defaults = 0;
+    PyObject* argdefs = PyFunction_GET_DEFAULTS( func );
+    if( ( argdefs ) && PyTuple_Check( argdefs ) )
+    {
+        defaults = &PyTuple_GET_ITEM( reinterpret_cast<PyTupleObject*>( argdefs ), 0 );
+        num_defaults = PyTuple_GET_SIZE( argdefs );
+    }
+
+    PyObject** keywords = 0;
+    Py_ssize_t num_keywords = func_kwargs ? PyDict_GET_SIZE( func_kwargs ) : 0;
+    if( num_keywords > 0 )
+    {
+        keywords = PyMem_NEW( PyObject*, 2 * num_keywords );
+        if( !keywords )
+            return PyErr_NoMemory();
+        Py_ssize_t i = 0;
+        Py_ssize_t pos = 0;
+        while( PyDict_Next( func_kwargs, &pos, &keywords[ i ], &keywords[ i + 1 ] ) )
+            i += 2;
+        num_keywords = i / 2;
+        /* XXX This is broken if the caller deletes dict items! */
+    }
+
+    PyObject* result = PyEval_EvalCodeEx(
+        PyFunction_GET_CODE( func ),
+        PyFunction_GET_GLOBALS( func ),
+        pyobject_cast(self),
+        arguments,
+        num_args,
+        keywords, num_keywords, defaults, num_defaults,
+        NULL, PyFunction_GET_CLOSURE( func )
+    );
+
+    if( keywords )
+        PyMem_DEL( keywords );
+
+    return result;
+
 }
 
 
@@ -798,7 +943,7 @@ PyObject* DynamicScope_get_f_globals( DynamicScope* self )
 
 PyObject* DynamicScope_get_f_builtins( DynamicScope* self )
 {
-    return cppy::incref( self->f_builtins );
+    return cppy::incref( self->f_builtins ? self->f_builtins : Py_None );
 }
 
 
@@ -821,6 +966,7 @@ DynamicScope_getset[] = {
 
 static PyMethodDef DynamicScope_methods[] = {
     {"get",    reinterpret_cast<PyCFunction>(DynamicScope_get), METH_FASTCALL, ""},
+    {"eval",    reinterpret_cast<PyCFunction>(DynamicScope_eval), METH_FASTCALL, "Evaluate a function in the scope"},
     { 0 }  // Sentinel
 };
 
@@ -836,6 +982,9 @@ static PyType_Slot DynamicScope_Type_slots[] = {
     { Py_mp_subscript, void_cast( DynamicScope_getitem ) },      /* mp_subscript */
     { Py_mp_ass_subscript, void_cast( DynamicScope_setitem ) },  /* mp_ass_subscript */
     { Py_sq_contains, void_cast( DynamicScope_contains ) },      /* sq_contains */
+//#if defined(Py_tp_vectorcall)
+//    { Py_tp_vectorcall, void_cast( DynamicScope_vectorcall ) },      /* tp_vectorcall */
+//#endif
     { 0, 0 },
 };
 
@@ -888,6 +1037,15 @@ dynamicscope_modexec( PyObject *mod )
     {
         return -1;  // LCOV_EXCL_LINE (failed to create string)
     }
+
+    d_storage_str = PyUnicode_InternFromString("_d_storage");
+    if ( !d_storage_str )
+        return -1;  // LCOV_EXCL_LINE (failed to create string)
+    get_str = PyUnicode_InternFromString("get");
+    if ( !get_str )
+        return -1;  // LCOV_EXCL_LINE (failed to create string)
+
+
     UserKeyError = PyErr_NewException( "dynamicscope.UserKeyError", 0, 0 );
     if( !UserKeyError )
     {
@@ -911,8 +1069,13 @@ dynamicscope_modexec( PyObject *mod )
 	}
     dynamicscope.release();
 
+
     if( PyModule_AddObjectRef( mod, "UserKeyError", UserKeyError ) < 0 )
         return -1; // LCOV_EXCL_LINE (failed to add to module)
+
+    super_disallowed = PyObject_GetAttrString( mod, "_super_disallowed" );
+    if( !super_disallowed )
+        return -1;  // LCOV_EXCL_LINE (failed import of known existing function)
 
     return 0;
 }
@@ -920,6 +1083,8 @@ dynamicscope_modexec( PyObject *mod )
 
 static PyMethodDef
 dynamicscope_methods[] = {
+    {"_super_disallowed", ( PyCFunction )_SuperDisallowed,
+        METH_VARARGS | METH_KEYWORDS, "Forbid use of super in declarative function"},
     { 0 }  // Sentinel
 };
 

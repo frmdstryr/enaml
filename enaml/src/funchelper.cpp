@@ -22,20 +22,28 @@ from Python's funcobject.c
 PyObject*
 call_func( PyObject* mod, PyObject *const *args, Py_ssize_t nargs )
 {
-    if( !(nargs == 4 || nargs == 3) )
+    const auto n = PyVectorcall_NARGS(nargs);
+    if( n < 3 || n > 4 )
     {
-        PyErr_SetString( PyExc_TypeError, "call_func must have 3 or 4 arguments" );
+        PyErr_SetString( PyExc_TypeError, "signature is call_func(func, locals [, args, kwargs])" );
         return 0;
     }
 
     PyObject* func = args[0];
-    PyObject* func_args = args[1];
-    PyObject* func_kwargs = args[2];
-    PyObject* func_locals = nargs == 4 ? args[3] : Py_None;
+    PyObject* func_locals = args[1];
+    PyObject* func_args = args[2];
+    PyObject* func_kwargs = 0;
+    Py_ssize_t num_keywords = 0;
 
     if( !PyFunction_Check( func ) )
     {
         PyErr_SetString( PyExc_TypeError, "function must be a Python function" );
+        return 0;
+    }
+
+    if( !PyMapping_Check( func_locals ) )
+    {
+        PyErr_SetString( PyExc_TypeError, "locals must be a mapping" );
         return 0;
     }
 
@@ -45,19 +53,16 @@ call_func( PyObject* mod, PyObject *const *args, Py_ssize_t nargs )
         return 0;
     }
 
-    if( !PyDict_Check( func_kwargs ) )
+    if( n > 3 )
     {
-        PyErr_SetString( PyExc_TypeError, "keywords must be a dict" );
-        return 0;
+        func_kwargs = args[3];
+        if ( !PyDict_Check( func_kwargs ) ) {
+            PyErr_SetString( PyExc_TypeError, "keywords must be a dict" );
+            return 0;
+        }
+        num_keywords = PyDict_GET_SIZE( func_kwargs );
     }
 
-    if( func_locals != Py_None && !PyMapping_Check( func_locals ) )
-    {
-        PyErr_SetString( PyExc_TypeError, "locals must be a mapping" );
-        return 0;
-    }
-    if( func_locals == Py_None )
-        func_locals = 0;
 
     PyObject** defaults = 0;
     Py_ssize_t num_defaults = 0;
@@ -69,7 +74,6 @@ call_func( PyObject* mod, PyObject *const *args, Py_ssize_t nargs )
     }
 
     PyObject** keywords = 0;
-    Py_ssize_t num_keywords = PyDict_GET_SIZE( func_kwargs );
     if( num_keywords > 0 )
     {
         keywords = PyMem_NEW( PyObject*, 2 * num_keywords );

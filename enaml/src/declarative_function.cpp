@@ -25,8 +25,8 @@ namespace enaml
 static PyObject* builtins_str;
 static PyObject* d_storage_str;
 static PyObject* get_str;
+static PyObject* eval_str;
 static PyObject* globals_str;
-static PyObject* super_str;
 
 
 // POD struct - all member fields are considered private
@@ -70,8 +70,6 @@ namespace
 
 static PyObject* DynamicScope;
 static PyObject* call_func;
-static PyObject* super_disallowed;
-
 
 #define FREELIST_MAX 128
 static int numfree = 0;
@@ -89,42 +87,15 @@ _SuperDisallowed( PyObject* mod, PyObject* args, PyObject* kwargs)
 /* Internal function used whan calling a DeclarativeFunc or
 BoundDeclarativeMethod */
 PyObject*
-_Invoke( PyObject* func, PyObject* key, PyObject* self, PyObject* args,
-         PyObject* kwargs )
+_Invoke( PyObject* func, PyObject* key, PyObject* self, PyObject* args, PyObject* kwargs )
 {
-    cppy::ptr f_globals( PyObject_GetAttr( func,  globals_str ) );
-    if( !f_globals )
-        return cppy::attribute_error( func, "__globals__" );
-    cppy::ptr f_builtins( cppy::xincref( PyDict_GetItem( f_globals.get(), builtins_str ) ) );
-    if( !f_builtins ){
-        PyErr_Format(
-            PyExc_KeyError,
-            "'%s'.__globals__ object has no key '%s'",
-            Py_TYPE( func )->tp_name, "__builtins__"
-        );
-        return 0;
-    }
-    cppy::ptr d_storage( PyObject_GetAttr(self, d_storage_str ) );
-    if( !d_storage )
-        return cppy::attribute_error( self, "_d_storage" );
-    cppy::ptr empty( PyDict_New() );
-    if ( !empty )
-        return 0;
-    PyObject* d_storage_get_args[] = { d_storage.get(), key, empty.get() };
-    cppy::ptr f_locals( PyObject_VectorcallMethod( get_str, d_storage_get_args, 2 | PY_VECTORCALL_ARGUMENTS_OFFSET, 0 ) );
-    if ( !f_locals )
-        return 0;
-    PyObject* dynamicscope_args[] = { self, f_locals.get(), f_globals.get(), f_builtins.get() };
-    cppy::ptr scope( PyObject_VectorcallDict( DynamicScope, dynamicscope_args, 4 | PY_VECTORCALL_ARGUMENTS_OFFSET, 0 ) );
+    PyObject* dynamicscope_args[] = { self, func, key };
+    cppy::ptr scope( PyObject_VectorcallDict( DynamicScope, dynamicscope_args, 3 | PY_VECTORCALL_ARGUMENTS_OFFSET, 0 ) );
     if ( !scope )
         return 0;
-    if( PyObject_SetItem( scope.get(), super_str, super_disallowed ) == -1 )
-        return cppy::system_error( "Failed to set key super in dynamic scope" );
-    cppy::ptr pkw( kwargs ? cppy::incref(kwargs) : PyDict_New() );
-    if( !pkw )
-        return 0;
-    PyObject* call_func_args[] = {func, args, pkw.get(), scope.get()};
-    return PyObject_VectorcallDict( call_func, call_func_args, 4 | PY_VECTORCALL_ARGUMENTS_OFFSET, 0 );
+
+    PyObject* eval_args[] = { scope.get(), func, args, kwargs };
+    return PyObject_VectorcallMethod(eval_str, eval_args, 4 | PY_VECTORCALL_ARGUMENTS_OFFSET, 0 );
 }
 
 
@@ -567,12 +538,6 @@ declarative_function_modexec( PyObject *mod )
         return -1;  // LCOV_EXCL_LINE (failed import of known existing function)
     }
 
-    cppy::ptr sup( PyObject_GetAttrString( mod, "_super_disallowed" ) );
-    if( !sup )
-    {
-        return -1;  // LCOV_EXCL_LINE (failed import of known existing function)
-    }
-
     if( !DFunc::Ready() )
     {
         return -1;  // LCOV_EXCL_LINE (failed type creation)
@@ -594,12 +559,12 @@ declarative_function_modexec( PyObject *mod )
     if ( !builtins_str )
         return -1;  // LCOV_EXCL_LINE (failed to create string)
 
-    super_str = PyUnicode_InternFromString("super");
-    if ( !super_str )
-        return -1;  // LCOV_EXCL_LINE (failed to create string)
-
     get_str = PyUnicode_InternFromString("get");
     if ( !get_str )
+        return -1;  // LCOV_EXCL_LINE (failed to create string)
+
+    eval_str = PyUnicode_InternFromString("eval");
+    if ( !eval_str )
         return -1;  // LCOV_EXCL_LINE (failed to create string)
 
     // DFunc
@@ -620,7 +585,6 @@ declarative_function_modexec( PyObject *mod )
 
     DynamicScope = dm_cls.release();
     call_func = fh_cls.release();
-    super_disallowed = sup.release();
 
     return 0;
 }
@@ -628,8 +592,6 @@ declarative_function_modexec( PyObject *mod )
 
 static PyMethodDef
 declarative_function_methods[] = {
-    {"_super_disallowed", ( PyCFunction )_SuperDisallowed,
-     METH_VARARGS | METH_KEYWORDS, "Forbid use of super in declarative function"},
     { 0 }  // Sentinel
 };
 

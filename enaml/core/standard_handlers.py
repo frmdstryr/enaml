@@ -57,11 +57,8 @@ class StandardReadHandler(ReadHandler, HandlerMixin):
 
         """
         func = self.func
-        f_globals = func.__globals__
-        f_builtins = f_globals['__builtins__']
-        f_locals = self.get_locals(owner)
-        scope = DynamicScope(owner, f_locals, f_globals, f_builtins)
-        return call_func(func, (), {}, scope)
+        scope = DynamicScope(owner, func, self.scope_key)
+        return call_func(func, scope, ())
 
 
 class StandardWriteHandler(WriteHandler, HandlerMixin):
@@ -75,11 +72,8 @@ class StandardWriteHandler(WriteHandler, HandlerMixin):
 
         """
         func = self.func
-        f_globals = func.__globals__
-        f_builtins = f_globals['__builtins__']
-        f_locals = self.get_locals(owner)
-        scope = DynamicScope(owner, f_locals, f_globals, f_builtins, change)
-        call_func(func, (), {}, scope)
+        scope = DynamicScope(owner, func, self.scope_key, change)
+        call_func(func, scope, ())
 
 
 class StandardTracedReadHandler(ReadHandler, HandlerMixin):
@@ -93,12 +87,9 @@ class StandardTracedReadHandler(ReadHandler, HandlerMixin):
 
         """
         func = self.func
-        f_globals = func.__globals__
-        f_builtins = f_globals['__builtins__']
-        f_locals = self.get_locals(owner)
         tr = StandardTracer(owner, name)
-        scope = DynamicScope(owner, f_locals, f_globals, f_builtins, None, tr)
-        return call_func(func, (tr,), {}, scope)
+        scope = DynamicScope(owner, func, self.scope_key, None, tr)
+        return call_func(func, scope, (tr,))
 
 
 class StandardInvertedWriteHandler(WriteHandler, HandlerMixin):
@@ -112,9 +103,6 @@ class StandardInvertedWriteHandler(WriteHandler, HandlerMixin):
 
         """
         func = self.func
-        f_globals = func.__globals__
-        f_builtins = f_globals['__builtins__']
-        f_locals = self.get_locals(owner)
-        scope = DynamicScope(owner, f_locals, f_globals, f_builtins)
+        scope = DynamicScope(owner, func, self.scope_key)
         inverter = StandardInverter(scope)
-        call_func(func, (inverter, change['value']), {}, scope)
+        return call_func(func, scope, (inverter, change['value']))
